@@ -1,0 +1,3 @@
+C:/CPP/CRouter/build/CMakeFiles/CRouter.dir
+C:/CPP/CRouter/build/CMakeFiles/edit_cache.dir
+C:/CPP/CRouter/build/CMakeFiles/rebuild_cache.dir
