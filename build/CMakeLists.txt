@@ -30,7 +30,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${BOOST_ROOT}
-    ../src/libs/asio-1.34.2/include
     ../src/libs/rapidjson-master/include
     ../src/libs
 )
