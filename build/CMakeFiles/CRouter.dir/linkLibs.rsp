@@ -1,1 +1,0 @@
- -lws2_32 -lmswsock -lpthread "C:/CPP/global_libs/boost_1_88_0/stage/lib/libboost_system-mgw13-mt-x64-1_88.a" "C:/CPP/global_libs/boost_1_88_0/stage/lib/libboost_thread-mgw13-mt-x64-1_88.a" -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 
