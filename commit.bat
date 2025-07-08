@@ -1,6 +1,7 @@
 @echo off
 set /p msg="Enter commit message: "
 git add .
+pause
 git commit -m "%msg%"
 git remote get-url origin >nul 2>&1
 IF ERRORLEVEL 1 (
