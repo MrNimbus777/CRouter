@@ -10,5 +10,5 @@ IF ERRORLEVEL 1 (
     git remote set-url origin https://github.com/MrNimbus777/CRouter.git
 )
 git pull --rebase origin main
-git push origin main
+git push --force origin main
 pause
