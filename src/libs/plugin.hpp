@@ -15,6 +15,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <mutex>
 
 #include "request.hpp"
 
@@ -101,14 +102,20 @@ inline std::string replace_all(const std::string &str, const std::string &from, 
 class Logger : public ILogger {
    public:
     void log(const std::string &message) override {
+        std::lock_guard<std::mutex> lock(mutex_);
         std::cout << "\033[0m[" << __PLUGIN_HELPER__::getTime() << "] " << __PLUGIN_HELPER__::replace_all(message, "\n", "\n    ") << "\033[0m\n";
     }
     void warning(const std::string &message) override {
+        std::lock_guard<std::mutex> lock(mutex_);
         std::cout << "\033[0m[" << __PLUGIN_HELPER__::getTime() << "] " << "\033[34m[WARNING] " << __PLUGIN_HELPER__::replace_all(message, "\n", "\n    ") << "\033[0m\n";
     }
     void error(const std::string &message) override {
+        std::lock_guard<std::mutex> lock(mutex_);
         std::cout << "\033[0m[" << __PLUGIN_HELPER__::getTime() << "] " << "\033[31m[ERROR] " << __PLUGIN_HELPER__::replace_all(message, "\n", "\n    ") << "\033[0m\n";
     }
+
+   private:
+    std::mutex mutex_;
 };
 
 Logger _LOGGER_;

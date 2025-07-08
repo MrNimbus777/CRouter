@@ -83,8 +83,7 @@ class IPlugin {
 
 #endif)";
 
-const char* request_hpp =
-    R"(#ifndef REQUEST_HPP
+const char* request_hpp = R"(#ifndef REQUEST_HPP
 #define REQUEST_HPP
 
 #include <sstream>
