@@ -4,7 +4,13 @@ project(CRouter LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin)
-set(BOOST_ROOT "") #path to boost
+
+# DON'T FORGET TO SET THE PATH !!!
+#
+set(BOOST_ROOT "../path/to/boost_1_88_0")  
+#
+# DON'T FORGET TO SET THE PATH !!!
+
 set(BOOST_LIBRARYDIR "${BOOST_ROOT}/stage/lib")
 include_directories("${BOOST_ROOT}")
 
