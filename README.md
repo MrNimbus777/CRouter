@@ -104,3 +104,5 @@ You can edit this file to customize how unhandled requests are processed.
 ---
 
 Made with ❤️ in C++
+
+<sub><i>Description generated with help of [ChatGPT](https://chatgpt.com/)</i></sub>
