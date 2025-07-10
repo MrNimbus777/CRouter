@@ -6,20 +6,20 @@
 
 ## Features
 
-* **Parallel HTTP Request Handling**
-  - Built on Boost.Asio for asynchronous and concurrent request processing.
+* ### Parallel HTTP Request Handling
+  Built on Boost.Asio for asynchronous and concurrent request processing.
 
-* **Background Worker Pool**
-  - Heavy or blocking tasks are offloaded to a background thread pool.
+* ### Background Worker Pool
+  Heavy or blocking tasks are offloaded to a background thread pool.
 
-* **Auto Routing System**
-  - Simple and clean routing based on URL paths, automatically delegating to plugins.
+* ### Auto Routing System
+  Simple and clean routing based on URL paths, automatically delegating to plugins.
 
-* **Powerful Plugin System**
-  - Write modular handlers as standalone `.cpp` files that compile and integrate dynamically. Customizable and ideal for extensions.
+* ### Powerful Plugin System
+  Write modular handlers as standalone `.cpp` files that compile and integrate dynamically. Customizable and ideal for extensions.
 
-* **Static File Server**
-  - Built-in support for serving static files.
+* ### Static File Server
+  Built-in support for serving static files.
 
 ---
 
