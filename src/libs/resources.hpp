@@ -1,6 +1,6 @@
 #pragma once
 const char* _env =
-R"(#Database info
+    R"#(#Database info
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
@@ -12,9 +12,9 @@ DEFAULT_REQUEST_HANDLER=true
 HTML_ROUTING=true
 
 # Debug mode not implemented yet
-DEBUG_MODE=false)";
+DEBUG_MODE=false)#";
 
-const char* plugin_hpp = R"(#ifndef PLUGIN_HPP
+const char* plugin_hpp = R"#(#ifndef PLUGIN_HPP
 #define PLUGIN_HPP
 
 #ifdef _WIN32
@@ -81,9 +81,9 @@ class IPlugin {
     IJson* _JSON_ = nullptr;
 };
 
-#endif)";
+#endif)#";
 
-const char* request_hpp = R"(#ifndef REQUEST_HPP
+const char* request_hpp = R"#(#ifndef REQUEST_HPP
 #define REQUEST_HPP
 
 #include <sstream>
@@ -251,10 +251,10 @@ class Response {
     std::unordered_map<std::string, std::string> headers_;
     std::string body_;
 };
-#endif)";
+#endif)#";
 
-const char* test_cpp = 
-R"(#include <iostream>
+const char* test_cpp =
+    R"#(#include <iostream>
 #include <string>
 
 #include "../headers/plugin.hpp"
@@ -263,7 +263,7 @@ R"(#include <iostream>
 class Plugin : public IPlugin {
    public:
     Response handle(Request request) override {
-        auto root = _JSON_->parse(R"({"message": "Here you have a json Object"})\");
+        auto root = _JSON_->parse(R"({"message": "Here you have a json Object"})");
 
         std::string raw_json = _JSON_->getStringVal(root->getDocument());
         _LOGGER_->log(raw_json);
@@ -283,10 +283,10 @@ class Plugin : public IPlugin {
 
 PLUGIN_EXPORT IPlugin* create() {
     return new Plugin;
-})";
+})#";
 
 const char* custom_default_request_handler_cpp =
-    R"(#include "headers/request.hpp"
+    R"#(#include "headers/request.hpp"
 extern "C" {
     Response handle(Request req) {
         Response response;
@@ -294,10 +294,10 @@ extern "C" {
         response.setBody("<h1>Hello World</h1>");
         return response;
     }
-})";
+})#";
 
-const char* index_html = 
-R"(<!DOCTYPE html>
+const char* index_html =
+    R"#(<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -308,15 +308,15 @@ R"(<!DOCTYPE html>
 <body>
     <h1>Hello World!</h1>
 </body>
-</html>)";
+</html>)#";
 
-const char* style_css = 
-R"(h1 {
+const char* style_css =
+    R"#(h1 {
     background-color: green;
-})";
+})#";
 
-const char* _404_NOT_FOUND_HTML = 
-R"(<!DOCTYPE html>
+const char* _404_NOT_FOUND_HTML =
+    R"#(<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -368,4 +368,4 @@ R"(<!DOCTYPE html>
     <p class="description">The page you're looking for might have been removed or is temporarily unavailable.</p>
   </div>
 </body>
-</html>)";
+</html>)#";
