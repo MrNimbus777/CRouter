@@ -40,8 +40,8 @@ Make sure the following libraries are available before building:
 
 1. Download one of the prebuilt versions:
 
-   * [**Windows**](https://github.com/MrNimbus777/CRouter/releases/tag/windows-prebuilt)
-   * [**Linux**](https://github.com/MrNimbus777/CRouter/releases/tag/linux-prebuilt)s
+   * [Windows](https://github.com/MrNimbus777/CRouter/releases/tag/windows-prebuilt)
+   * [Linux](https://github.com/MrNimbus777/CRouter/releases/tag/linux-prebuilt)
 
 2. Run the executable. On first launch, it will:
 
