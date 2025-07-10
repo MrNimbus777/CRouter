@@ -98,7 +98,7 @@ You can edit this file to customize how unhandled requests are processed.
 ## Credits
 
 * **MimeTypes** [https://github.com/lasselukkari/MimeTypes](https://github.com/lasselukkari/MimeTypes)
-* **Boost** [https://github.com/lasselukkari/MimeTypes](https://github.com/lasselukkari/MimeTypes)
+* **Boost** [https://www.boost.org/](https://www.boost.org/)
 
 ---
 
