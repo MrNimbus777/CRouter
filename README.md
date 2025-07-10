@@ -4,26 +4,26 @@
 
 ---
 
-## ⚙️ Features
+## Features
 
-* **🔁 Parallel HTTP Request Handling**
+* **Parallel HTTP Request Handling**
   Built on Boost.Asio for true asynchronous and concurrent request processing.
 
-* **⚙️ Background Worker Pool**
+* **Background Worker Pool**
   Heavy or blocking tasks are seamlessly offloaded to a background thread pool.
 
-* **🤭 Auto Routing System**
+* **Auto Routing System**
   Simple and clean routing based on URL paths, automatically delegating to plugins.
 
-* **🔌 Powerful Plugin System**
+* **Powerful Plugin System**
   Write modular handlers as standalone `.cpp` files that compile and integrate dynamically. Customizable and ideal for extensions.
 
-* **📂 Static File Server**
+* **Static File Server**
   Built-in support for serving static files, using [MimeTypes](https://github.com/lasselukkari/MimeTypes) by **lasselukkari** for proper content-type resolution.
 
 ---
 
-## 📆 Build Dependencies
+## Build Dependencies
 
 Make sure the following libraries are available before building:
 
@@ -34,14 +34,14 @@ Make sure the following libraries are available before building:
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
-### 🔽 Option 1: Use Prebuilt Binaries
+### Option 1: Use Prebuilt Binaries
 
 1. Download one of the prebuilt versions:
 
-   * **Windows** (`.exe`)
-   * **Linux** (`.elf`)
+   * [**Windows**](https://github.com/MrNimbus777/CRouter/releases/tag/windows-prebuilt)
+   * [**Linux**](https://github.com/MrNimbus777/CRouter/releases/tag/linux-prebuilt)s
 
 2. Run the executable. On first launch, it will:
 
@@ -49,11 +49,11 @@ Make sure the following libraries are available before building:
    * Generate a sample **Hello World** page
    * Create an example plugin file: `/app/handlers/test.cpp`
 
-> ⚠️ **Note**: You must have `g++` installed (**MinGW** recommended on Windows). The plugin system strictly depends on the `g++` command to compile handlers. Using other compilers (like MSVC) may cause the plugin system to fail.
+> **Note**: You must have `g++` installed (**MinGW** recommended on Windows). The plugin system strictly depends on the `g++` command to compile handlers. Using other compilers (like MSVC) may cause the plugin system to fail.
 
 ---
 
-### 💡 Option 2: Build from Source
+### Option 2: Build from Source
 
 Clone the repository and compile it using your favorite environment. Ensure all dependencies are installed, and that you're using **g++** as your compiler.
 
@@ -67,9 +67,9 @@ make
 
 ---
 
-## 📚 How It Works
+## How It Works
 
-### 🧹 Plugin-based Routing
+### Plugin-based Routing
 
 CRouter's routing system maps incoming request paths directly to handler plugins:
 
@@ -83,7 +83,7 @@ Each plugin defines the logic for that route. On each request, CRouter dynamical
 
 ---
 
-### 🛠️ Custom Default Request Handler
+### Custom Default Request Handler
 
 You can override the default fallback handler:
 
@@ -95,7 +95,7 @@ You can edit this file to customize how unhandled requests are processed.
 
 ---
 
-## 🙏 Credits
+## Credits
 
 * **MimeTypes** [https://github.com/lasselukkari/MimeTypes](https://github.com/lasselukkari/MimeTypes)
 * **Boost** [https://github.com/lasselukkari/MimeTypes](https://github.com/lasselukkari/MimeTypes)
