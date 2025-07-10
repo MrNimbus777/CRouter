@@ -57,8 +57,8 @@ Make sure the following libraries are available before building:
 
 Clone the repository and compile it using your favorite environment. Ensure all dependencies are installed, and that you're using **g++** as your compiler.
 
+Example:
 ```bash
-#e.g.
 git clone https://github.com/MrNimbus777/CRouter.git
 cd CRouter
 mkdir build && cd build
@@ -99,7 +99,7 @@ You can edit this file to customize how unhandled requests are processed.
 ## Credits
 
 * **MimeTypes** [https://github.com/lasselukkari/MimeTypes](https://github.com/lasselukkari/MimeTypes)
-* **Boost** [https://www.boost.org/](https://www.boost.org/)
+* **Boost** [https://www.boost.org](https://www.boost.org)
 
 ---
 
