@@ -57,7 +57,8 @@ Make sure the following libraries are available before building:
 
 Clone the repository and compile it using your favorite environment. Ensure all dependencies are installed, and that you're using **g++** as your compiler.
 
-```bash  e.g.
+```bash
+#e.g.
 git clone https://github.com/MrNimbus777/CRouter.git
 cd CRouter
 mkdir build && cd build
