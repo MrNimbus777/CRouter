@@ -38,34 +38,62 @@ Response func(Request req) {
     if (req.method == "GET") {
         try {
             std::filesystem::path public_root = std::filesystem::canonical("./public");
-            std::filesystem::path full_path = std::filesystem::canonical(public_root / std::filesystem::path(path).relative_path());
+            std::string uri_path = req.uri;
+            if (uri_path.empty() || uri_path == "/") {
+                uri_path = "/index.html";
+            }
+
+            std::filesystem::path requested_path = std::filesystem::path(uri_path).relative_path();
+            std::filesystem::path full_path = std::filesystem::canonical(public_root / requested_path);
 
             if (full_path.string().find(public_root.string()) != 0) {
-                Response res;
                 res.setStatus(403, "Forbidden");
                 res.setHeader("Content-Type", "text/html");
                 res.setBody("<h1>403 Forbidden</h1>");
                 return res;
             }
 
+            if (std::filesystem::is_directory(full_path)) {
+                full_path /= "index.html";
+            }
+
             if (!std::filesystem::is_regular_file(full_path)) {
-                full_path = full_path / "index.html";
+                throw std::filesystem::filesystem_error("File not found", std::error_code());
             }
 
             std::ifstream file(full_path, std::ios::in | std::ios::binary);
-            if (!file.is_open()) throw std::filesystem::filesystem_error("File not found", std::error_code());
+            if (!file.is_open()) {
+                throw std::filesystem::filesystem_error("File not found or inaccessible", std::error_code());
+            }
 
-            std::ostringstream contents;
-            contents << file.rdbuf();
-            std::string content = contents.str();
-
+            res.setStatus(200, "OK");
             res.setHeader("Content-Type", MimeTypes::getType(full_path.extension().string().c_str()));
+            std::ifstream file(full_path, std::ios::in | std::ios::binary);
+
+            file.seekg(0, std::ios::end);
+            std::streampos file_size = file.tellg();
+            file.seekg(0, std::ios::beg);
+
+            std::string content;
+            if (file_size > 0) {
+                content.resize(static_cast<std::string::size_type>(file_size));
+                file.read(&content[0], file_size);
+            }
             res.setBody(content);
+            return res;
+
         } catch (const std::filesystem::filesystem_error& e) {
-            Response res;
+            // Log the actual error for debugging, but send 404 to client
+            _LOGGER_.warning("Filesystem error while serving: " + std::string(e.what()));
             res.setStatus(404, "Not Found");
             res.setHeader("Content-Type", "text/html");
-            res.setBody(_404_NOT_FOUND_HTML);
+            res.setBody("<h1>404 Not Found</h1>");  // Use a consistent 404 page
+            return res;
+        } catch (const std::exception& e) {
+            _LOGGER_.error("Unexpected error serving static file: " + std::string(e.what()));
+            res.setStatus(500, "Internal Server Error");
+            res.setHeader("Content-Type", "text/html");
+            res.setBody("<h1>500 Internal Server Error</h1>");
             return res;
         }
     } else {

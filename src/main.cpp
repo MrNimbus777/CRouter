@@ -35,7 +35,6 @@ int main() {
 
     PluginInstance default_handler_instance = {std::unordered_map<std::string, void*>(), nullptr};
     std::function<Response(Request)> defaultHandler = nullptr;
-
     if (CONF.default_request_handler) {
         defaultHandler = _default_req_handler::func;
     } else {
@@ -60,7 +59,7 @@ int main() {
 
         boost::asio::thread_pool worker_pool(4);
 
-        serv::Server server(io_context, 8080, worker_pool, [&defaultHandler](Request r) -> serv::Handler {
+        serv::Server server(io_context, CONF.port, worker_pool, [&defaultHandler](Request r) -> serv::Handler {
             serv::Handler h = {defaultHandler, false};
 
             std::string main_route = r.uri.size() > 1 ? r.uri.substr(1, r.uri.find("/", 1)) : "";

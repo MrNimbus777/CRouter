@@ -1,6 +1,9 @@
 #pragma once
 const char* _env =
-    R"#(#Database info
+    R"#(#Server
+SERVER_PORT=8080
+
+#Database info
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root

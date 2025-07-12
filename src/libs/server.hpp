@@ -85,9 +85,9 @@ class Session : public std::enable_shared_from_this<Session> {
                             std::string error_response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
                             boost::asio::post(strand_, [self, error_response]() {
                                 boost::asio::async_write(self->socket_, boost::asio::buffer(error_response),
-                                    [self](boost::system::error_code write_ec, std::size_t /*length*/) {
+                                    [self](boost::system::error_code write_ec, std::size_t) {
                                         if (write_ec) {
-                                            _LOGGER_.error("Error sending error response: " + write_ec.message());
+                                            _LOGGER_.error("Error sending response: " + write_ec.message());
                                         }
                                         self->socket_.close();
                                     });
@@ -106,7 +106,7 @@ class Session : public std::enable_shared_from_this<Session> {
 
         boost::asio::async_write(socket_, boost::asio::buffer(response),
             boost::asio::bind_executor(strand_,
-                [this, self](boost::system::error_code ec, std::size_t) {
+                [this, self, response](boost::system::error_code ec, std::size_t) {
                     if (ec == boost::asio::error::operation_aborted) {
                         _LOGGER_.warning("Write operation timed out or was aborted for session.");
                         socket_.close();

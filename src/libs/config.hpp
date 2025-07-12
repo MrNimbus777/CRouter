@@ -10,6 +10,9 @@
 #include "plugin.hpp"
 
 struct Config {
+    // Server
+    int port = 8080;
+
     // Database
     std::string db_host = "localhost";
     int db_port = 3306;
@@ -62,6 +65,8 @@ std::unordered_map<std::string, std::string> parseEnvFile(const std::string& fil
 
 void loadConfig(Config& config, const std::string& filename) {
     const std::unordered_map<std::string, std::string> env = env_parser::parseEnvFile(filename);
+    if (env.count("SERVER_PORT"))
+        config.db_port = std::stoi(env.at("SERVER_PORT"));
     if(env.count("DB_HOST")) 
         config.db_host = env.at("DB_HOST");
     if(env.count("DB_PORT")) 
