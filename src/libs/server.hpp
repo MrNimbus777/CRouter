@@ -47,7 +47,7 @@ class Session : public std::enable_shared_from_this<Session> {
         socket_.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
         socket_.socket().close(ec);
         if (ec) {
-            _LOGGER_.error("Error closing socket: " + ec.message());
+            _LOGGER_.error("Error closing socket: " + ec.message() + " (Error code: " + std::to_string(ec.value()) + ")");
         }
         _LOGGER_.log("Session closed.");
     }
@@ -73,7 +73,7 @@ class Session : public std::enable_shared_from_this<Session> {
                             boost::asio::buffers_begin(self->request_buffer_.data()) + self->request_buffer_.size());
                         self->request_buffer_.consume(self->request_buffer_.size());
 
-                        _LOGGER_.log("Request received:\n" + full_request_content.substr(0, std::min(full_request_content.length(), (size_t)500)) + "...");
+                        _LOGGER_.log("Request received:\n" + (full_request_content.length() > 512 ? (full_request_content.substr(0, (size_t)512) + "\n. . .") : full_request_content));
 
                         Request req = Request::parse(full_request_content);
                         Handler handler = self->handler_builder_(req);
@@ -95,7 +95,7 @@ class Session : public std::enable_shared_from_this<Session> {
                                         boost::asio::async_write(self->socket_, boost::asio::buffer(error_response),
                                             [self](boost::system::error_code write_ec, std::size_t) {
                                                 if (write_ec) {
-                                                    _LOGGER_.error("Error sending response: " + write_ec.message());
+                                                    _LOGGER_.error("Error sending response: " + write_ec.message()+ " (Error code: " + std::to_string(write_ec.value()) + ")");
                                                 }
                                                 self->do_close();
                                             });
@@ -117,7 +117,7 @@ class Session : public std::enable_shared_from_this<Session> {
                                     boost::asio::async_write(self->socket_, boost::asio::buffer(error_response),
                                         [self](boost::system::error_code write_ec, std::size_t) {
                                             if (write_ec) {
-                                                _LOGGER_.error("Error sending response: " + write_ec.message());
+                                                _LOGGER_.error("Error sending response: " + write_ec.message() + " (Error code: " + std::to_string(write_ec.value()) + ")");
                                             }
                                             self->do_close();
                                         });
@@ -130,7 +130,7 @@ class Session : public std::enable_shared_from_this<Session> {
                             self->do_close();
                             return;
                         }
-                        _LOGGER_.error("Error during read headers: " + ec.message() + " " + std::to_string(ec.value()));
+                        _LOGGER_.error("Error during read headers: " + ec.message() + " (Error code: " + std::to_string(ec.value()) + ")");
                         self->do_close();
                     }
                 }));
@@ -149,14 +149,14 @@ class Session : public std::enable_shared_from_this<Session> {
             boost::asio::bind_executor(strand_,
                 [self, response_ptr](boost::system::error_code ec, std::size_t bytes_transferred) {
                     if (ec == boost::asio::error::operation_aborted) {
-                        _LOGGER_.log("Write operation timed out or was aborted for session (Error code: " + std::to_string(ec.value()) + ").");
+                        _LOGGER_.log("Write operation timed out or was aborted for session (Error code: " + std::to_string(ec.value()) + ")");
                         self->do_close();
                         return;
                     }
                     if (!ec) {
                         self->do_read_headers();
                     } else {
-                        _LOGGER_.error("Error during write: " + ec.message() + " (Error code: " + std::to_string(ec.value()) + ").");
+                        _LOGGER_.error("Error during write: " + ec.message() + " (Error code: " + std::to_string(ec.value()) + ")");
                         self->do_close();
                     }
                 }));
