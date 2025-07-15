@@ -68,7 +68,6 @@ Response func(Request req) {
 
             res.setStatus(200, "OK");
             res.setHeader("Content-Type", MimeTypes::getType(full_path.extension().string().c_str()));
-            std::ifstream file(full_path, std::ios::in | std::ios::binary);
 
             file.seekg(0, std::ios::end);
             std::streampos file_size = file.tellg();
@@ -83,11 +82,10 @@ Response func(Request req) {
             return res;
 
         } catch (const std::filesystem::filesystem_error& e) {
-            // Log the actual error for debugging, but send 404 to client
             _LOGGER_.warning("Filesystem error while serving: " + std::string(e.what()));
             res.setStatus(404, "Not Found");
             res.setHeader("Content-Type", "text/html");
-            res.setBody("<h1>404 Not Found</h1>");  // Use a consistent 404 page
+            res.setBody("<h1>404 Not Found</h1>");
             return res;
         } catch (const std::exception& e) {
             _LOGGER_.error("Unexpected error serving static file: " + std::string(e.what()));

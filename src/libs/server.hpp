@@ -41,82 +41,123 @@ class Session : public std::enable_shared_from_this<Session> {
     }
 
    private:
+    void do_close() {
+        boost::system::error_code ec;
+        socket_.socket().cancel(ec);
+        socket_.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+        socket_.socket().close(ec);
+        if (ec) {
+            _LOGGER_.error("Error closing socket: " + ec.message());
+        }
+        _LOGGER_.log("Session closed.");
+    }
     void do_read_headers() {
+        if (!socket_.socket().is_open()) {
+            _LOGGER_.warning("Attempted to read from a closed socket. Aborting read operation.");
+            return;
+        }
         auto self = shared_from_this();
         socket_.expires_after(std::chrono::seconds(30));
 
-        boost::asio::async_read_until(socket_, request_buffer_, "\r\n\r\n",
+        boost::asio::async_read_until(socket_.socket(), request_buffer_, "\r\n\r\n",
             boost::asio::bind_executor(strand_,
-                [this, self](boost::system::error_code ec, std::size_t length) {
+                [self](boost::system::error_code ec, std::size_t length) {
                     if (ec == boost::asio::error::operation_aborted) {
                         _LOGGER_.warning("Read headers timed out or was aborted for session.");
-                        socket_.close();
+                        self->do_close();
                         return;
                     }
                     if (!ec) {
                         std::string full_request_content(
-                            boost::asio::buffers_begin(request_buffer_.data()),
-                            boost::asio::buffers_begin(request_buffer_.data()) + request_buffer_.size());
-                        request_buffer_.consume(request_buffer_.size());
+                            boost::asio::buffers_begin(self->request_buffer_.data()),
+                            boost::asio::buffers_begin(self->request_buffer_.data()) + self->request_buffer_.size());
+                        self->request_buffer_.consume(self->request_buffer_.size());
 
                         _LOGGER_.log("Request received:\n" + full_request_content.substr(0, std::min(full_request_content.length(), (size_t)500)) + "...");
 
-                        try {
-                            Request req = Request::parse(full_request_content);
-                            Handler handler = handler_builder_(req);
+                        Request req = Request::parse(full_request_content);
+                        Handler handler = self->handler_builder_(req);
 
-                            if (handler.isHeavy) {
-                                boost::asio::post(worker_pool_, [this, self, req, handler]() {
-                                    Response res = handler.func(req);
-                                    std::string response = res.toString();
-                                    boost::asio::post(strand_, [this, self, response]() {
-                                        do_write(response);
+                        auto func = handler.func;
+                        if (handler.isHeavy) {
+                            boost::asio::post(self->worker_pool_, [self, req, func]() {
+                                try {
+                                    Response res_obj = func(req);
+                                    std::string response_str = res_obj.toString();
+
+                                    boost::asio::post(self->strand_, [self, response_str]() {
+                                        self->do_write(response_str);
                                     });
+                                } catch (const std::exception& ex) {
+                                    _LOGGER_.error("Error processing request: " + std::string(ex.what()));
+                                    std::string error_response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
+                                    boost::asio::post(self->strand_, [self, error_response]() {
+                                        boost::asio::async_write(self->socket_, boost::asio::buffer(error_response),
+                                            [self](boost::system::error_code write_ec, std::size_t) {
+                                                if (write_ec) {
+                                                    _LOGGER_.error("Error sending response: " + write_ec.message());
+                                                }
+                                                self->do_close();
+                                            });
+                                    });
+                                }
+                            });
+                        } else {
+                            try {
+                                Response res_obj = func(req);
+                                std::string response_str = res_obj.toString();
+
+                                boost::asio::post(self->strand_, [self, response_str]() {
+                                    self->do_write(response_str);
                                 });
-                            } else {
-                                Response res = handler.func(req);
-                                std::string response = res.toString();
-                                boost::asio::post(strand_, [this, self, response]() {
-                                    do_write(response);
+                            } catch (const std::exception& ex) {
+                                _LOGGER_.error("Error processing request: " + std::string(ex.what()));
+                                std::string error_response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
+                                boost::asio::post([self, error_response]() {
+                                    boost::asio::async_write(self->socket_, boost::asio::buffer(error_response),
+                                        [self](boost::system::error_code write_ec, std::size_t) {
+                                            if (write_ec) {
+                                                _LOGGER_.error("Error sending response: " + write_ec.message());
+                                            }
+                                            self->do_close();
+                                        });
                                 });
                             }
-                        } catch (const std::exception& ex) {
-                            _LOGGER_.error("Error processing request: " + std::string(ex.what()));
-                            std::string error_response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
-                            boost::asio::post(strand_, [self, error_response]() {
-                                boost::asio::async_write(self->socket_, boost::asio::buffer(error_response),
-                                    [self](boost::system::error_code write_ec, std::size_t) {
-                                        if (write_ec) {
-                                            _LOGGER_.error("Error sending response: " + write_ec.message());
-                                        }
-                                        self->socket_.close();
-                                    });
-                            });
                         }
                     } else {
-                        _LOGGER_.error("Error during read headers: " + ec.message());
-                        socket_.close();
+                        if (ec == boost::asio::error::timed_out) {
+                            _LOGGER_.log("Read operation timed out or was aborted for session.");
+                            self->do_close();
+                            return;
+                        }
+                        _LOGGER_.error("Error during read headers: " + ec.message() + " " + std::to_string(ec.value()));
+                        self->do_close();
                     }
                 }));
     }
 
     void do_write(const std::string& response) {
+        if (!socket_.socket().is_open()) {
+            _LOGGER_.warning("Attempted to write to a closed socket. Aborting write operation.");
+            return;
+        }
         auto self = shared_from_this();
         socket_.expires_after(std::chrono::seconds(30));
+        auto response_ptr = std::make_shared<std::string>(std::move(response));
 
-        boost::asio::async_write(socket_, boost::asio::buffer(response),
+        boost::asio::async_write(socket_.socket(), boost::asio::buffer(*response_ptr),
             boost::asio::bind_executor(strand_,
-                [this, self, response](boost::system::error_code ec, std::size_t) {
+                [self, response_ptr](boost::system::error_code ec, std::size_t bytes_transferred) {
                     if (ec == boost::asio::error::operation_aborted) {
-                        _LOGGER_.warning("Write operation timed out or was aborted for session.");
-                        socket_.close();
+                        _LOGGER_.log("Write operation timed out or was aborted for session (Error code: " + std::to_string(ec.value()) + ").");
+                        self->do_close();
                         return;
                     }
                     if (!ec) {
-                        do_read_headers();
+                        self->do_read_headers();
                     } else {
-                        _LOGGER_.error("Error during write: " + ec.message());
-                        socket_.close();
+                        _LOGGER_.error("Error during write: " + ec.message() + " (Error code: " + std::to_string(ec.value()) + ").");
+                        self->do_close();
                     }
                 }));
     }
@@ -164,4 +205,4 @@ class Server {
     unsigned short port_;
 };
 
-}
+}  // namespace serv

@@ -117,21 +117,21 @@ class Response {
     }
 
     std::string toString() const {
-        std::ostringstream stream;
+        std::string headers_str;
 
-        stream << "HTTP/1.1 " << statusCode_ << " " << statusMessage_ << "\r\n";
+        headers_str += "HTTP/1.1 " + std::to_string(statusCode_) + " " + statusMessage_ + "\r\n";
 
         for (const auto& [name, value] : headers_) {
-            stream << name << ": " << value << "\r\n";
+            headers_str += name + ": " + value + "\r\n";
         }
 
-        stream << "\r\n";
+        headers_str += "\r\n";
 
-        stream << body_;
+        std::string full_response = headers_str;
+        full_response.append(body_);
 
-        return stream.str();
+        return full_response;
     }
-
     void clear() {
         headers_.clear();
         body_.clear();
