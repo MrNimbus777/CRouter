@@ -88,7 +88,6 @@ Response func(Request req) {
             res.setContentType(MimeTypes::getType(full_path.extension().string().c_str()));
             res.setBody(content);
             res.setCacheControl("public, max-age=2678400");
-            _LOGGER_.warning("Returning Response...");
             return res;
         } catch (const std::filesystem::filesystem_error& e) {
             _LOGGER_.warning("Filesystem error while serving: " + std::string(e.what()));
