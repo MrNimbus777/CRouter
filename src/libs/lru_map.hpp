@@ -70,7 +70,7 @@ class lru_map {
     lru_map(std::function<long(V)> one_element_size) : head(nullptr), tail(nullptr), func(std::move(one_element_size)), max_bytes(16777216) {}
     lru_map(std::function<long(V)> one_element_size, long max_bytes) : head(nullptr), tail(nullptr), func(std::move(one_element_size)), max_bytes(max_bytes) {}
     void put(const K& key, const V& val) {
-        mtx.lock();
+        std::lock_guard<std::mutex> lock(mtx);
         if (func(val) > max_bytes) throw std::runtime_error("lru_map::put(const K& key, const V& val): val bigger than max_bytes");
         if (!head) {
             head = new Node;
@@ -96,20 +96,18 @@ class lru_map {
                 head = find;
             }
         }
-        mtx.unlock();
     }
     bool exists(const K& key) {
-        mtx.lock();
+        std::lock_guard<std::mutex> lock(mtx);
         Node* find = head;
         while (find) {
             if (find->key == key) break;
             find = find->next;
         }
-        mtx.unlock();
         return find != nullptr;
     }
     void remove(const K& key) {
-        mtx.lock();
+        std::lock_guard<std::mutex> lock(mtx);
         Node* find = head;
         while (find) {
             if (find->key == key) break;
@@ -126,10 +124,9 @@ class lru_map {
                 tail = find->prev;
             delete find;
         }
-        mtx.unlock();
     }
-    V get(const K& key) {
-        mtx.lock();
+    const V& get(const K& key) {
+        std::lock_guard<std::mutex> lock(mtx);
         Node* find = head;
         while (find) {
             if (find->key == key) break;
@@ -137,38 +134,32 @@ class lru_map {
         }
         if (find) {
             move_to_head(find);
-            mtx.unlock();
             return find->val;
         }
-        mtx.unlock();
         throw std::runtime_error("lru_map::get(const K& key): key not found");
     }
     int size() {
-        mtx.lock();
+        std::lock_guard<std::mutex> lock(mtx);
         int counter = 0;
         Node* current = head;
         while (current) {
             counter++;
             current = current->next;
         }
-        mtx.unlock();
         return counter;
     }
     long byte_size() {
-        mtx.lock();
-        long ret = byte_size_mtx();
-        mtx.unlock();
-        return ret;
+        std::lock_guard<std::mutex> lock(mtx);
+        return byte_size_mtx();
     }
     ~lru_map() {
-        mtx.lock();
+        std::lock_guard<std::mutex> lock(mtx);
         Node* current = head;
         while (current) {
             Node* next = current->next;
             delete current;
             current = next;
         }
-        mtx.unlock();
     }
     lru_map() = delete;
     lru_map(const lru_map&) = delete;
