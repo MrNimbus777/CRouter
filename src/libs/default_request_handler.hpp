@@ -8,8 +8,12 @@
 #include "config.hpp"
 #include "request.hpp"
 #include "resources.hpp"
+#include "lru_map.hpp"
 
 namespace _default_req_handler {
+lru_map<std::string, std::string> cache([](std::string str) -> long {
+    return str.size();
+});
 Response func(Request req) {
     Response res;
 
@@ -60,27 +64,32 @@ Response func(Request req) {
                 throw std::filesystem::filesystem_error("File not found", std::error_code());
             }
 
-            std::ifstream file(full_path, std::ios::in | std::ios::binary);
-            if (!file.is_open()) {
-                throw std::filesystem::filesystem_error("File not found or inaccessible", std::error_code());
+            std::string content;
+            if(cache.exists(full_path.string())){
+                content = cache.get(full_path.string());
+            } else {
+                std::ifstream file(full_path, std::ios::in | std::ios::binary);
+                if (!file.is_open()) {
+                    throw std::filesystem::filesystem_error("File not found or inaccessible", std::error_code());
+                }
+
+                file.seekg(0, std::ios::end);
+                std::streampos file_size = file.tellg();
+                file.seekg(0, std::ios::beg);
+
+                if (file_size > 0) {
+                    content.resize(static_cast<std::string::size_type>(file_size));
+                    file.read(&content[0], file_size);
+                }
+                cache.put(full_path.string(), content);
             }
 
             res.setStatus(200, "OK");
             res.setContentType(MimeTypes::getType(full_path.extension().string().c_str()));
-
-            file.seekg(0, std::ios::end);
-            std::streampos file_size = file.tellg();
-            file.seekg(0, std::ios::beg);
-
-            std::string content;
-            if (file_size > 0) {
-                content.resize(static_cast<std::string::size_type>(file_size));
-                file.read(&content[0], file_size);
-            }
             res.setBody(content);
             res.setCacheControl("public, max-age=2678400");
+            _LOGGER_.warning("Returning Response...");
             return res;
-
         } catch (const std::filesystem::filesystem_error& e) {
             _LOGGER_.warning("Filesystem error while serving: " + std::string(e.what()));
             res.setStatus(404, "Not Found");
