@@ -23,7 +23,7 @@ void write_default_resources(){
     }
     if (!std::filesystem::exists("./app/handlers")) {
         if (std::filesystem::create_directories("./app/handlers")) {
-            std::cout << "Created directory: app/requesthandlers" << '\n';
+            std::cout << "Created directory: app/handlers" << '\n';
             std::ofstream out("app/handlers/test.cpp");
             out << test_cpp;
             out.close();
