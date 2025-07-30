@@ -32,9 +32,4 @@ namespace _PLUGINS_ {
         }
         return nullptr;
     }
-    void freePlugins(){
-        for(auto pair : loadedPlugins){
-            pair.second;
-        }
-    }
 }

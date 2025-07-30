@@ -74,14 +74,33 @@ class IJson {
     virtual ~IJson() = default;
 };
 
+class IWebSocket {
+   public:
+    virtual void send(const std::string &message) = 0;
+    virtual void registerKey(const std::string &) = 0;
+    virtual const std::string &getKey() = 0;
+    virtual void setOnRecieve(std::function<void(const std::string &)> func) = 0;
+    virtual ~IWebSocket() = default;
+};
+class IWebSocketPool {
+   public:
+    virtual IWebSocket *getSocket(const std::string &key) = 0;
+    virtual IWebSocket *make_from_request(Request &request) = 0;
+    virtual void putSocket(const std::string &key, IWebSocket *ws) = 0;
+    virtual void erase_and_close(const std::string &key) = 0;
+    virtual ~IWebSocketPool() = default;
+};
+
 class IPlugin {
    public:
-    virtual Response handle(Request) = 0;
+    virtual Response handle(Request&) = 0;
     virtual bool isHeavy() = 0;
+    virtual ~IPlugin() = default;
 
    protected:
     ILogger* _LOGGER_ = nullptr;
     IJson* _JSON_ = nullptr;
+    IWebSocketPool* _WEBSOCKETS_ = nullptr;
 };
 
 #endif)#";
@@ -265,7 +284,8 @@ const char* test_cpp =
 
 class Plugin : public IPlugin {
    public:
-    Response handle(Request request) override {
+    Response handle(Request& request) override {
+        _LOGGER_->log("Handle");
         auto root = _JSON_->parse(R"({"message": "Here you have a json Object"})");
 
         std::string raw_json = _JSON_->getStringVal(root->getDocument());
@@ -274,9 +294,8 @@ class Plugin : public IPlugin {
         std::string content = "<h1>" + raw_json + "</h1>";
 
         Response response;
-        response.setBody(content);
         response.setHeader("Content-Type", "text/html");
-        response.setHeader("Content-Length", std::to_string(content.length()));
+        response.setBody(content);
         return response;
     }
     bool isHeavy() override {
@@ -284,14 +303,14 @@ class Plugin : public IPlugin {
     }
 };
 
-PLUGIN_EXPORT IPlugin* create() {
+PLUGIN_EXPORT IPlugin* create() {    
     return new Plugin;
 })#";
 
 const char* custom_default_request_handler_cpp =
     R"#(#include "headers/request.hpp"
 extern "C" {
-    Response handle(Request req) {
+    Response handle(Request& req) {
         Response response;
         response.setHeader("Content-Type", "text/html");
         response.setBody("<h1>Hello World</h1>");

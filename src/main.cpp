@@ -34,7 +34,7 @@ int main() {
     _PLUGINS_::loadPlugins("app/handlers");
 
     PluginInstance default_handler_instance = {std::unordered_map<std::string, void*>(), nullptr};
-    std::function<Response(Request)> defaultHandler = nullptr;
+    std::function<Response(Request&)> defaultHandler = nullptr;
     if (CONF.default_request_handler) {
         defaultHandler = _default_req_handler::func;
     } else {
@@ -46,7 +46,7 @@ int main() {
         }
         try {
             PluginInstance default_handler_instance = loadFunctions(compileFile("./app/custom_default_request_handler.cpp"), {"handle"});
-            defaultHandler = (std::function<Response(Request)>)reinterpret_cast<Response (*)(Request)>(default_handler_instance.functions_map["handle"]);
+            defaultHandler = (std::function<Response(Request&)>)reinterpret_cast<Response (*)(Request&)>(default_handler_instance.functions_map["handle"]);
         } catch (std::exception e) {
             logger.error("Failed to compile and load the custom_default_request_handler.cpp (" + std::string(e.what()) + ")");
             defaultHandler = _default_req_handler::func;

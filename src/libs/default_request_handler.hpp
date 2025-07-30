@@ -14,7 +14,7 @@ namespace _default_req_handler {
 lru_map<std::string, std::string> cache([](std::string str) -> long {
     return str.size();
 });
-Response func(Request req) {
+Response func(Request& req) {
     Response res;
 
     std::string path = req.uri;
