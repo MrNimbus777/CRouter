@@ -12,10 +12,17 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
+#include <boost/asio.hpp>
+#include <boost/beast.hpp>
+#include <deque>
 #include <iostream>
-#include <string>
-#include <vector>
+#include <memory>
 #include <mutex>
+#include <string>
+#include <thread>
+#include <unordered_map>
+#include <vector>
+#include <queue>
 
 #include "request.hpp"
 
@@ -57,9 +64,26 @@ class IJson {
     virtual ~IJson() = default;
 };
 
+class IWebSocket {
+   public:
+    virtual void send(const std::string &message) = 0;
+    virtual void registerKey(const std::string &) = 0;
+    virtual const std::string &getKey() = 0;
+    virtual void setOnRecieve(std::function<void(const std::string &)> func) = 0;
+    virtual ~IWebSocket() = default;
+};
+class IWebSocketPool {
+   public:
+    virtual IWebSocket *getSocket(const std::string &key) = 0;
+    virtual IWebSocket *make_from_request(Request &request) = 0;
+    virtual void putSocket(const std::string &key, IWebSocket *ws) = 0;
+    virtual void erase_and_close(const std::string &key) = 0;
+    virtual ~IWebSocketPool() = default;
+};
+
 class IPlugin {
    public:
-    virtual Response handle(Request) = 0;
+    virtual Response handle(Request &) = 0;
     virtual bool isHeavy() = 0;
     IPlugin *setLogger(ILogger *logger) {
         this->_LOGGER_ = logger;
@@ -69,10 +93,16 @@ class IPlugin {
         this->_JSON_ = json;
         return this;
     }
+    IPlugin *setWSM(IWebSocketPool *websockets) {
+        this->_WEBSOCKETS_ = websockets;
+        return this;
+    }
+    virtual ~IPlugin() = default;
 
    protected:
     ILogger *_LOGGER_ = nullptr;
     IJson *_JSON_ = nullptr;
+    IWebSocketPool *_WEBSOCKETS_ = nullptr;
 };
 
 #include <ctime>
@@ -97,7 +127,7 @@ inline std::string replace_all(const std::string &str, const std::string &from, 
 
     return result;
 }
-}
+}  // namespace __PLUGIN_HELPER__
 
 class Logger : public ILogger {
    public:
@@ -227,5 +257,154 @@ class Json : public IJson {
 };
 
 Json _JSON_;
+
+class WebSocketSession : public std::enable_shared_from_this<WebSocketSession>, public IWebSocket {
+   public:
+    WebSocketSession(
+        std::shared_ptr<boost::beast::websocket::stream<boost::beast::tcp_stream>> ws,
+        boost::asio::io_context &io_context,
+        boost::asio::thread_pool &worker_pool)
+        : ws_(ws),
+          io_context_(io_context),
+          worker_pool_(worker_pool),
+          strand_(io_context) {}
+
+    void start() {
+        ws_->set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
+
+        ws_->set_option(boost::beast::websocket::stream_base::decorator(
+            [](boost::beast::websocket::response_type &res) {
+                res.set(boost::beast::http::field::server,
+                    std::string(BOOST_BEAST_VERSION_STRING) + " serv-websocket-server");
+            }));
+        _LOGGER_.log("WebSocket session started.");
+        do_read();
+    }
+
+    void send(const std::string &message) override {
+        boost::asio::post(strand_, [self = shared_from_this(), message = std::move(message)]() mutable {
+            bool write_in_progress = !self->write_queue_.empty();
+            self->write_queue_.push(std::move(message));
+            if (!write_in_progress) {
+                self->do_write();
+            }
+        });
+    }
+    void registerKey(const std::string &key) override;
+    const std::string &getKey() override {
+        return this->key;
+    }
+    void setOnRecieve(std::function<void(const std::string&)> func) override {
+        _LOGGER_.log("setOnRecieve() called.");
+        this->func = std::move(func);
+    }
+    void close(std::function<void()> on_closed = nullptr) {
+        auto self = this;
+        ws_->async_close(boost::beast::websocket::close_code::normal,
+            [self, on_closed](boost::system::error_code ec) {
+                if (ec) {
+                    _LOGGER_.error("WebSocket close failed: " + ec.message());
+                } else {
+                    _LOGGER_.log("WebSocket closed successfully.");
+                }
+                if (on_closed) on_closed();
+            });
+    }
+
+   private:
+    void do_read() {
+        auto self = shared_from_this();
+        ws_->async_read(buffer_,
+            boost::asio::bind_executor(strand_,
+                [self](boost::system::error_code ec, std::size_t bytes_transferred) {
+                    if (ec == boost::beast::websocket::error::closed) {
+                        _LOGGER_.log("WebSocket connection closed.");
+                        return;
+                    }
+                    if (ec) {
+                        _LOGGER_.error("Error during WebSocket read: " + ec.message() + " (Error code: " + std::to_string(ec.value()) + ")");
+                        return;
+                    }
+
+                    std::string message = boost::beast::buffers_to_string(self->buffer_.data());
+                    self->buffer_.consume(self->buffer_.size());
+
+                    _LOGGER_.log("WebSocket message received: " + message);
+
+                    boost::asio::post(self->worker_pool_, [self, message]() {
+                        self->func(message);
+                    });
+
+                    self->do_read();
+                }));
+    }
+
+    void do_write() {
+        if (write_queue_.empty()) {
+            return;
+        }
+
+        ws_->async_write(boost::asio::buffer(write_queue_.front()),
+            boost::asio::bind_executor(strand_,
+                [self = shared_from_this()](boost::system::error_code ec, std::size_t bytes_transferred) {
+                    if (ec) {
+                        _LOGGER_.error("Error during WebSocket write: " + ec.message() + " (Error code: " + std::to_string(ec.value()) + ")");
+                        return;
+                    }
+                    self->write_queue_.pop();
+                    self->do_write();
+                }));
+    }
+    friend class WebSocketPool;
+    std::shared_ptr<boost::beast::websocket::stream<boost::beast::tcp_stream>> ws_;
+    boost::asio::io_context &io_context_;
+    boost::asio::thread_pool &worker_pool_;
+    boost::asio::io_context::strand strand_;
+    boost::beast::flat_buffer buffer_;
+    std::queue<std::string> write_queue_;
+    std::function<void(const std::string &)> func;
+    std::string key = "empty key";
+};
+namespace serv{
+    class Session;
+};
+class WebSocketPool : public IWebSocketPool {
+   private:
+    std::unordered_map<std::string, IWebSocket *> map_;
+
+   public:
+    std::unordered_map<Request *, std::shared_ptr<serv::Session>> request_sockets;
+    IWebSocket *getSocket(const std::string &key) {
+        auto it = map_.find(key);
+        if (it == map_.end()) return nullptr;
+        return it->second;
+    }
+    IWebSocket *make_from_request(Request &req);
+
+    void putSocket(const std::string &key, IWebSocket *ws) {
+        map_[key] = ws;
+    }
+    void erase_and_close(const std::string &key) {
+        auto it = map_.find(key);
+        if (it == map_.end()) return;
+
+        WebSocketSession *ptr = (WebSocketSession *)it->second;
+
+        ptr->close([this, key, ptr]() {
+            map_.erase(key);
+            delete ptr;
+        });
+    }
+    ~WebSocketPool() {
+        for (auto it : map_) {
+            delete (WebSocketSession *)it.second;
+        }
+    }
+};
+WebSocketPool _WEBSOCKETS_;
+void WebSocketSession::registerKey(const std::string &key) {
+    this->key = key;
+    _WEBSOCKETS_.putSocket(key, this);
+}
 
 #endif

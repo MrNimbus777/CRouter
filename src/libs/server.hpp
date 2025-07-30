@@ -12,7 +12,9 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#include <unordered_map>
 #include <vector>
+#include <string>
 
 #include "plugin.hpp"
 #include "request.hpp"
@@ -20,10 +22,10 @@
 namespace serv {
 
 struct Handler {
-    std::function<Response(Request)> func;
+    std::function<Response(Request&)> func;
     bool isHeavy;
 };
-using HandlerBuilder = std::function<Handler(Request)>;
+using HandlerBuilder = std::function<Handler(Request&)>;
 
 class Session : public std::enable_shared_from_this<Session> {
    public:
@@ -41,6 +43,7 @@ class Session : public std::enable_shared_from_this<Session> {
     }
 
    private:
+    std::mutex mtx;
     void do_close() {
         boost::system::error_code ec;
         socket_.socket().cancel(ec);
@@ -51,6 +54,7 @@ class Session : public std::enable_shared_from_this<Session> {
         }
         _LOGGER_.log("Session closed.");
     }
+
     void do_read_headers() {
         if (!socket_.socket().is_open()) {
             _LOGGER_.warning("Attempted to read from a closed socket. Aborting read operation.");
@@ -73,16 +77,23 @@ class Session : public std::enable_shared_from_this<Session> {
                             boost::asio::buffers_begin(self->request_buffer_.data()) + self->request_buffer_.size());
                         self->request_buffer_.consume(self->request_buffer_.size());
 
-                        _LOGGER_.log("Request received:\n" + (full_request_content.length() > 512 ? (full_request_content.substr(0, (size_t)512) + "\n. . .") : full_request_content));
+                        _LOGGER_.log("Request received:\n" + (full_request_content.length() > 512 && false ? (full_request_content.substr(0, (size_t)512) + " (. . .)") : full_request_content));
 
                         Request req = Request::parse(full_request_content);
                         Handler handler = self->handler_builder_(req);
 
                         auto func = handler.func;
                         if (handler.isHeavy) {
-                            boost::asio::post(self->worker_pool_, [self, req, func]() {
+                            boost::asio::post(self->worker_pool_, [self, &req, func]() {
                                 try {
-                                    Response res_obj = func(req);
+                                    Response res_obj;
+                                    {
+                                        std::lock_guard<std::mutex> lock(self->mtx);
+                                        _WEBSOCKETS_.request_sockets[&req] = self;
+                                        res_obj = func(req);
+                                        if(_WEBSOCKETS_.request_sockets.find(&req) == _WEBSOCKETS_.request_sockets.end()) return;
+                                        _WEBSOCKETS_.request_sockets.erase(&req);
+                                    }
                                     std::string response_str = res_obj.toString();
 
                                     boost::asio::post(self->strand_, [self, response_str]() {
@@ -104,7 +115,14 @@ class Session : public std::enable_shared_from_this<Session> {
                             });
                         } else {
                             try {
-                                Response res_obj = func(req);
+                                Response res_obj;
+                                {
+                                    std::lock_guard<std::mutex> lock(self->mtx);
+                                    _WEBSOCKETS_.request_sockets[&req] = self;
+                                    res_obj = func(req);
+                                    if(_WEBSOCKETS_.request_sockets.find(&req) == _WEBSOCKETS_.request_sockets.end()) return;
+                                    _WEBSOCKETS_.request_sockets.erase(&req);
+                                }
                                 std::string response_str = res_obj.toString();
 
                                 boost::asio::post(self->strand_, [self, response_str]() {
@@ -127,10 +145,16 @@ class Session : public std::enable_shared_from_this<Session> {
                     } else {
                         if (ec == boost::asio::error::timed_out) {
                             _LOGGER_.log("Read operation timed out or was aborted for session.");
-                            self->do_close();
-                            return;
+                        } else if (
+                            ec == boost::asio::error::eof ||
+                            ec == boost::asio::error::operation_aborted ||
+                            ec.value() == 10053 ||
+                            ec.value() == 10054
+                        ){
+                            _LOGGER_.log("Client disconnected during header read: " + ec.message() + " (Error code: " + std::to_string(ec.value()) + ")");
+                        } else {
+                            _LOGGER_.error("Error during read headers: " + ec.message() + " (Error code: " + std::to_string(ec.value()) + ")");
                         }
-                        _LOGGER_.error("Error during read headers: " + ec.message() + " (Error code: " + std::to_string(ec.value()) + ")");
                         self->do_close();
                     }
                 }));
@@ -161,15 +185,14 @@ class Session : public std::enable_shared_from_this<Session> {
                     }
                 }));
     }
-
     boost::beast::tcp_stream socket_;
     boost::asio::io_context& io_context_;
     boost::asio::thread_pool& worker_pool_;
     HandlerBuilder handler_builder_;
     boost::asio::io_context::strand strand_;
     boost::asio::streambuf request_buffer_;
+    friend WebSocketPool;
 };
-
 class Server {
    public:
     Server(boost::asio::io_context& io_context, unsigned short port, boost::asio::thread_pool& worker_pool, HandlerBuilder handler_builder)
@@ -206,3 +229,40 @@ class Server {
 };
 
 }  // namespace serv
+
+IWebSocket* WebSocketPool::make_from_request(Request& req) {
+    auto it = request_sockets.find(&req);
+    if (it == request_sockets.end() || !it->second) return nullptr;
+
+    auto session = it->second;
+    request_sockets.erase(it);
+
+
+    auto ws_stream = std::make_shared<boost::beast::websocket::stream<boost::beast::tcp_stream>>(std::move(session->socket_));
+
+    auto ws_session = std::make_shared<WebSocketSession>(
+        ws_stream,
+        session->io_context_,
+        session->worker_pool_);
+
+    ws_stream->next_layer().expires_never();
+
+
+    boost::asio::dispatch(
+        ws_session->strand_,
+        [ws_stream, ws_session, &req]() {
+            ws_stream->async_accept(
+                req.to_beast(),
+                boost::asio::bind_executor(
+                    ws_session->strand_,
+                    [ws_stream, ws_session](boost::system::error_code ec) {
+                        if (ec) {
+                            _LOGGER_.error("WebSocket handshake failed: " + ec.message());
+                            return;
+                        }
+                        _LOGGER_.log("WebSocket handshake succeeded.");
+                        ws_session->start();
+                    }));
+        });
+    return ws_session.get();
+}

@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 #include "dynamic_compiler.hpp"
+#include "plugin.hpp"
 
 
 namespace _PLUGINS_ {
@@ -18,7 +19,7 @@ namespace _PLUGINS_ {
                 auto it = plugin.functions_map.find("create");
                 if (it != plugin.functions_map.end()) {
                     IPlugin* pl = ((IPlugin*(*)()) it->second)();
-                    loadedPlugins[name] = pl->setLogger(&_LOGGER_)->setJSON(&_JSON_);
+                    loadedPlugins[name] = pl->setLogger(&_LOGGER_)->setJSON(&_JSON_)->setWSM(&_WEBSOCKETS_);
                     _LOGGER_.log("Loaded plugin: " + name);
                 } else _LOGGER_.error("Failed to load " + name);
             }
@@ -30,5 +31,10 @@ namespace _PLUGINS_ {
             return it->second;
         }
         return nullptr;
+    }
+    void freePlugins(){
+        for(auto pair : loadedPlugins){
+            pair.second;
+        }
     }
 }

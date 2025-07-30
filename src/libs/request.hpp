@@ -4,6 +4,8 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <boost/beast/http.hpp>
+#include <boost/beast/version.hpp>
 
 class Request {
    public:
@@ -40,6 +42,34 @@ class Request {
         req.body = body_stream.str();
 
         return req;
+    }
+
+    boost::beast::http::request<boost::beast::http::string_body> to_beast() const {
+        using namespace boost::beast;
+        using http_request = http::request<http::string_body>;
+
+        http_request beast_req;
+
+        if (method == "GET") beast_req.method(http::verb::get);
+        else if (method == "POST") beast_req.method(http::verb::post);
+        else if (method == "PUT") beast_req.method(http::verb::put);
+        else if (method == "DELETE") beast_req.method(http::verb::delete_);
+        else beast_req.method(http::verb::unknown);
+
+        beast_req.target(uri);
+
+        if (http_version == "HTTP/1.0") beast_req.version(10);
+        else if (http_version == "HTTP/1.1") beast_req.version(11);
+        else beast_req.version(11);
+
+        for (const auto& [key, value] : headers) {
+            beast_req.set(key, value);
+        }
+
+        beast_req.body() = body;
+        beast_req.prepare_payload();
+
+        return beast_req;
     }
 };
 
