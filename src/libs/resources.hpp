@@ -80,6 +80,7 @@ class IWebSocket {
     virtual void registerKey(const std::string &) = 0;
     virtual const std::string &getKey() = 0;
     virtual void setOnRecieve(std::function<void(const std::string &)> func) = 0;
+    virtual void setOnClose(std::function<void()>) = 0;
     virtual ~IWebSocket() = default;
 };
 class IWebSocketPool {

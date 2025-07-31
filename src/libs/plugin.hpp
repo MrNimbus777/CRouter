@@ -46,6 +46,7 @@ class IJson {
     };
 
     virtual std::shared_ptr<IDocument> createDocument() const = 0;
+    virtual VALUE createNullValue() = 0;
     virtual std::shared_ptr<IDocument> parse(std::string raw_json) = 0;
 
     virtual void setString(std::shared_ptr<IDocument> root, VALUE json, std::string value) = 0;
@@ -69,7 +70,8 @@ class IWebSocket {
     virtual void send(const std::string &message) = 0;
     virtual void registerKey(const std::string &) = 0;
     virtual const std::string &getKey() = 0;
-    virtual void setOnRecieve(std::function<void(const std::string &)> func) = 0;
+    virtual void setOnRecieve(std::function<void(const std::string &)>) = 0;
+    virtual void setOnClose(std::function<void()>) = 0;
     virtual ~IWebSocket() = default;
 };
 class IWebSocketPool {
@@ -167,6 +169,9 @@ class Json : public IJson {
         std::shared_ptr<Document> doc_ptr = std::make_shared<Document>();
         doc_ptr->setDocument(std::make_unique<rapidjson::Document>());
         return doc_ptr;
+    }
+    VALUE createNullValue() override {
+        return std::make_shared<rapidjson::Value>().get();
     }
     std::shared_ptr<IDocument> parse(std::string raw_json) override {
         std::shared_ptr<Document> doc_ptr = std::make_shared<Document>();
@@ -268,7 +273,7 @@ class WebSocketSession : public std::enable_shared_from_this<WebSocketSession>, 
           io_context_(io_context),
           worker_pool_(worker_pool),
           strand_(io_context) {}
-
+    ~WebSocketSession();
     void start() {
         ws_->set_option(boost::beast::websocket::stream_base::timeout::suggested(boost::beast::role_type::server));
 
@@ -294,20 +299,22 @@ class WebSocketSession : public std::enable_shared_from_this<WebSocketSession>, 
     const std::string &getKey() override {
         return this->key;
     }
-    void setOnRecieve(std::function<void(const std::string&)> func) override {
-        _LOGGER_.log("setOnRecieve() called.");
-        this->func = std::move(func);
+    void setOnRecieve(std::function<void(const std::string&)> onrecieve) override {
+        this->onrecieve = std::move(onrecieve);
     }
-    void close(std::function<void()> on_closed = nullptr) {
-        auto self = this;
+    void setOnClose(std::function<void()> onclose) override {
+        this->onclose = std::move(onclose);
+    }
+    void close() {
+        auto self = shared_from_this();
         ws_->async_close(boost::beast::websocket::close_code::normal,
-            [self, on_closed](boost::system::error_code ec) {
+            [self](boost::system::error_code ec) {
                 if (ec) {
                     _LOGGER_.error("WebSocket close failed: " + ec.message());
                 } else {
                     _LOGGER_.log("WebSocket closed successfully.");
                 }
-                if (on_closed) on_closed();
+                if (self->onclose) self->onclose();
             });
     }
 
@@ -332,7 +339,7 @@ class WebSocketSession : public std::enable_shared_from_this<WebSocketSession>, 
                     _LOGGER_.log("WebSocket message received: " + message);
 
                     boost::asio::post(self->worker_pool_, [self, message]() {
-                        self->func(message);
+                        if(self->onrecieve) self->onrecieve(message);
                     });
 
                     self->do_read();
@@ -362,7 +369,8 @@ class WebSocketSession : public std::enable_shared_from_this<WebSocketSession>, 
     boost::asio::io_context::strand strand_;
     boost::beast::flat_buffer buffer_;
     std::queue<std::string> write_queue_;
-    std::function<void(const std::string &)> func;
+    std::function<void(const std::string &)> onrecieve = nullptr;
+    std::function<void()> onclose = nullptr;
     std::string key = "empty key";
 };
 namespace serv{
@@ -389,16 +397,10 @@ class WebSocketPool : public IWebSocketPool {
         if (it == map_.end()) return;
 
         WebSocketSession *ptr = (WebSocketSession *)it->second;
+        
+        map_.erase(it);
 
-        ptr->close([this, key, ptr]() {
-            map_.erase(key);
-            delete ptr;
-        });
-    }
-    ~WebSocketPool() {
-        for (auto it : map_) {
-            delete (WebSocketSession *)it.second;
-        }
+        if(ptr) if(ptr->ws_->is_open()) ptr->close();
     }
 };
 WebSocketPool _WEBSOCKETS_;
@@ -406,5 +408,7 @@ void WebSocketSession::registerKey(const std::string &key) {
     this->key = key;
     _WEBSOCKETS_.putSocket(key, this);
 }
-
+WebSocketSession::~WebSocketSession(){
+    _WEBSOCKETS_.erase_and_close(key);
+}
 #endif

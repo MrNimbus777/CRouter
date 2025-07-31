@@ -54,7 +54,7 @@ class Session : public std::enable_shared_from_this<Session> {
         }
         _LOGGER_.log("Session closed.");
     }
-
+ 
     void do_read_headers() {
         if (!socket_.socket().is_open()) {
             _LOGGER_.warning("Attempted to read from a closed socket. Aborting read operation.");
