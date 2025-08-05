@@ -1,6 +1,6 @@
 # CRouter – A High-Performance C++ Web Framework
 
-**CRouter** is a lightweight, high-performance backend web framework written in modern **C++**, built atop **Boost.Asio** and related Boost libraries. Designed for speed, extensibility, and simplicity, it enables clean development of modular web servers and APIs.
+**CRouter** is a lightweight, high-performance backend web framework written in modern **C++**, built atop **Boost.Asio** and related Boost libraries. Designed for speed, extensibility, and simplicity, it enables clean development of modular web servers.
 
 ---
 
