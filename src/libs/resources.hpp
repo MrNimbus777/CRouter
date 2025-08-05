@@ -9,7 +9,7 @@ DEFAULT_REQUEST_HANDLER=true
 # Primitive routing. Part of default request handler. If true, get requests to a url such us your.host.com/example will return the file ./public/example.html
 HTML_ROUTING=true
 # Caches the most used static files. Up to 16 MB. This way 
-CACHE=true
+CATCHE=true
 #</SETTINGS RELATED TO THE DEFAULT HANDLER>
 
 # Debug mode not implemented yet
@@ -249,7 +249,7 @@ class Plugin : public IPlugin {
    public:
     Response handle(Request& request) override {
         _LOGGER_->warning("/app/handlers/test.cpp was not edited!");
-        std::string content = "<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Document</title></head><body><h1>Hello World</h1></body></html>";
+        std::string content = R"(<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Document</title></head><body><h1>Hello World</h1></body></html>)";
 
         Response response;
         response.setHeader("Content-Type", "text/html");

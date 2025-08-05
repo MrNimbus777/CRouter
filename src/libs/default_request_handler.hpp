@@ -65,8 +65,25 @@ Response func(Request& req) {
             }
 
             std::string content;
-            if(cache.exists(full_path.string())){
-                content = cache.get(full_path.string());
+            if(CONF.cache){
+                if(cache.exists(full_path.string())){
+                    content = cache.get(full_path.string());
+                } else {
+                    std::ifstream file(full_path, std::ios::in | std::ios::binary);
+                    if (!file.is_open()) {
+                        throw std::filesystem::filesystem_error("File not found or inaccessible", std::error_code());
+                    }
+
+                    file.seekg(0, std::ios::end);
+                    std::streampos file_size = file.tellg();
+                    file.seekg(0, std::ios::beg);
+
+                    if (file_size > 0) {
+                        content.resize(static_cast<std::string::size_type>(file_size));
+                        file.read(&content[0], file_size);
+                    }
+                    cache.put(full_path.string(), content);
+                }
             } else {
                 std::ifstream file(full_path, std::ios::in | std::ios::binary);
                 if (!file.is_open()) {
@@ -81,7 +98,6 @@ Response func(Request& req) {
                     content.resize(static_cast<std::string::size_type>(file_size));
                     file.read(&content[0], file_size);
                 }
-                cache.put(full_path.string(), content);
             }
 
             res.setStatus(200, "OK");
