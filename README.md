@@ -15,7 +15,7 @@
 * ### Static File Server & Auto Routing System
   * Built-in support for serving static files (like .html, .css, .js, .png and so on).
   * Simple and clean routing based on URL paths, automatically delegating to plugins.
-  [Details...](https://github.com/MrNimbus777/CRouter/wiki#static-files-serving)
+  <sub><i>[Details...](https://github.com/MrNimbus777/CRouter/wiki#static-files-serving)</i></sub>
   
 
 * ### Powerful Plugin System
