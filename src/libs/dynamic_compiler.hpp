@@ -22,8 +22,18 @@ std::string compileFile(const std::string& path) {
         std::string name = entry.stem().string();
         std::filesystem::path dllPath = entry.parent_path() / (name + ".dll");
 
+        
         std::string compileCmd =
-            "g++ -shared -fPIC -o \"" + dllPath.string()  + "\" \"" + entry.string() + "\"";
+            "g++ -shared -fPIC -o \"" + dllPath.string()  + "\" \"" + entry.string() + "\" -I\"app/headers\"";
+        
+        std::ifstream file(entry.string());
+        std::string line;
+
+        if (file.is_open()) {
+            std::getline(file, line);
+            if(line.find("//cmp:") == 0) compileCmd.append(" ").append(line.substr(6));
+            file.close();
+        }
         
         _LOGGER_.log("Compiling " + entry.filename().string() + "...");
         if (std::system(compileCmd.c_str()) != 0) {

@@ -3,16 +3,14 @@ const char* _env =
     R"#(#Server
 SERVER_PORT=8080
 
-#Database info
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASS=database
-
+#<SETTINGS RELATED TO THE DEFAULT HANDLER>
 # If true, the app will use the default request handler. Otherwise, it will generate a new .cpp file with a function that you need to complete as needed. 
 DEFAULT_REQUEST_HANDLER=true
 # Primitive routing. Part of default request handler. If true, get requests to a url such us your.host.com/example will return the file ./public/example.html
 HTML_ROUTING=true
+# Caches the most used static files. Up to 16 MB. This way 
+CACHE=true
+#</SETTINGS RELATED TO THE DEFAULT HANDLER>
 
 # Debug mode not implemented yet
 DEBUG_MODE=false)#";
@@ -38,40 +36,6 @@ class ILogger {
     virtual void warning(const std::string&) = 0;
     virtual void error(const std::string&) = 0;
     virtual ~ILogger() = default;
-};
-
-using VALUE = void*;
-using DOCUMENT = VALUE;
-// I strongly reccommend to use another JSON lib, if you need a larger functionality!
-// This IJson class was implemented above the rapidjson lib. It was added only in order to have a default JSON parser directly in the app.
-// It was built on void* which implies both lack of stability and complex of code.
-// If you wish you could add another lib into /app/headers and then include them into your plugins.
-// E.g. #include "rapidjson-master/include/rapidjson/document.h"
-class IJson {
-   public:
-    class IDocument {
-       public:
-        virtual DOCUMENT getDocument() = 0;
-        virtual ~IDocument() = default;
-    };
-
-    virtual std::shared_ptr<IDocument> createDocumet() const = 0;
-    virtual std::shared_ptr<IDocument> parse(std::string raw_json) = 0;
-
-    virtual void setString(std::shared_ptr<IDocument> root, VALUE json, std::string value) = 0;
-    virtual void setObject(std::shared_ptr<IDocument> root, VALUE json, VALUE json_object) = 0;
-    virtual void setArray(std::shared_ptr<IDocument> root, VALUE json, std::vector<VALUE> json_array) = 0;
-
-    virtual bool existsKey(VALUE json, std::string str) = 0;
-    virtual VALUE getValueByKey(VALUE json, std::string key) = 0;
-    virtual VALUE createKey(std::shared_ptr<IDocument> root, VALUE json_object, std::string key) = 0;
-
-    virtual std::string getStringVal(VALUE json) const = 0;
-    virtual std::vector<VALUE> getArrayVal(VALUE json) = 0;
-
-    virtual std::string stringify(VALUE json) const = 0;
-
-    virtual ~IJson() = default;
 };
 
 class IWebSocket {
@@ -100,7 +64,6 @@ class IPlugin {
 
    protected:
     ILogger* _LOGGER_ = nullptr;
-    IJson* _JSON_ = nullptr;
     IWebSocketPool* _WEBSOCKETS_ = nullptr;
 };
 
@@ -277,22 +240,16 @@ class Response {
 #endif)#";
 
 const char* test_cpp =
-    R"#(#include <iostream>
-#include <string>
+    R"#(#include <string>
 
-#include "../headers/plugin.hpp"
-#include "../headers/request.hpp"
+#include <plugin.hpp>
+#include <request.hpp>
 
 class Plugin : public IPlugin {
    public:
     Response handle(Request& request) override {
-        _LOGGER_->log("Handle");
-        auto root = _JSON_->parse(R"({"message": "Here you have a json Object"})");
-
-        std::string raw_json = _JSON_->getStringVal(root->getDocument());
-        _LOGGER_->log(raw_json);
-
-        std::string content = "<h1>" + raw_json + "</h1>";
+        _LOGGER_->warning("/app/handlers/test.cpp was not edited!");
+        std::string content = "<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Document</title></head><body><h1>Hello World</h1></body></html>";
 
         Response response;
         response.setHeader("Content-Type", "text/html");
@@ -309,7 +266,7 @@ PLUGIN_EXPORT IPlugin* create() {
 })#";
 
 const char* custom_default_request_handler_cpp =
-    R"#(#include "headers/request.hpp"
+    R"#(#include <request.hpp>
 extern "C" {
     Response handle(Request& req) {
         Response response;

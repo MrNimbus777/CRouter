@@ -12,14 +12,15 @@
 * ### Background Worker Pool
   Heavy or blocking tasks are offloaded to a background thread pool.
 
-* ### Auto Routing System
-  Simple and clean routing based on URL paths, automatically delegating to plugins.
+* ### Static File Server & Auto Routing System
+  * Built-in support for serving static files (like .html, .css, .js, .png and so on).
+  * Simple and clean routing based on URL paths, automatically delegating to plugins.
+  [Details...](https://github.com/MrNimbus777/CRouter/wiki#static-files-serving)
+  
 
 * ### Powerful Plugin System
-  Write modular handlers as standalone `.cpp` files that compile and integrate dynamically. Customizable and ideal for extensions.
+  Write modular handlers as standalone `.cpp` files that compile and integrate dynamically. Customizable and ideal for extensions. <sub><i>[Details...](https://github.com/MrNimbus777/CRouter/wiki#plugin-system)</i></sub>
 
-* ### Static File Server
-  Built-in support for serving static files.
 
 ---
 
@@ -30,7 +31,6 @@ Make sure the following libraries are available before building:
 * [Boost.Asio](https://www.boost.org/doc/libs/release/doc/html/boost_asio.html)
 * [Boost.System](https://www.boost.org/doc/libs/release/libs/system/)
 * [Boost.Beast](https://www.boost.org/doc/libs/release/libs/beast/)
-* [RapidJSON](https://github.com/Tencent/rapidjson)
 
 ---
 
@@ -49,7 +49,7 @@ Make sure the following libraries are available before building:
    * Generate a sample **Hello World** page
    * Create an example plugin file: `/app/handlers/test.cpp`
 
-> **Note**: You must have `g++` installed (**MinGW** recommended on Windows). The plugin system strictly depends on the `g++` command to compile handlers. Using other compilers (like MSVC) may cause the plugin system to fail.
+> **Note**: You must have `g++` installed (**Clang** recommended on Windows). The plugin system strictly depends on the `g++` command to compile handlers. Using other compilers may cause the plugin system to fail.
 
 ---
 
@@ -88,7 +88,7 @@ Each plugin defines the logic for that route. On each request, CRouter dynamical
 
 You can override the default fallback handler:
 
-1. Update the `config.json` with the appropriate setting.
+1. Update the `.env` with the appropriate setting.
 2. On the next server start, CRouter will auto-generate:
    `/app/custom_default_request_handler.cpp`
 
@@ -105,4 +105,4 @@ You can edit this file to customize how unhandled requests are processed.
 
 Made with ❤️ in C++
 
-<sub><i>Description generated with help of [ChatGPT](https://chatgpt.com/)</i></sub>
+<sub><i>Description formated with help of [ChatGPT](https://chatgpt.com/)</i></sub>

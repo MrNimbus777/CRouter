@@ -19,7 +19,7 @@ namespace _PLUGINS_ {
                 auto it = plugin.functions_map.find("create");
                 if (it != plugin.functions_map.end()) {
                     IPlugin* pl = ((IPlugin*(*)()) it->second)();
-                    loadedPlugins[name] = pl->setLogger(&_LOGGER_)->setJSON(&_JSON_)->setWSM(&_WEBSOCKETS_);
+                    loadedPlugins[name] = pl->setLogger(&_LOGGER_)->setWSM(&_WEBSOCKETS_);
                     _LOGGER_.log("Loaded plugin: " + name);
                 } else _LOGGER_.error("Failed to load " + name);
             }
