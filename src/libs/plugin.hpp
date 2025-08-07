@@ -51,7 +51,7 @@ class IWebSocketPool {
 class IPlugin {
    public:
     virtual Response handle(Request &) = 0;
-    virtual bool isHeavy() = 0;
+    virtual bool isHeavy(){return false;};
     virtual void onLoad(){};
     IPlugin *setLogger(ILogger *logger) {
         this->_LOGGER_ = logger;

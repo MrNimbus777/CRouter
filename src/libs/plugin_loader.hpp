@@ -21,6 +21,7 @@ namespace _PLUGINS_ {
                     IPlugin* pl = ((IPlugin*(*)()) it->second)();
                     loadedPlugins[name] = pl->setLogger(&_LOGGER_)->setWSM(&_WEBSOCKETS_);
                     _LOGGER_.log("Loaded plugin: " + name);
+                    pl->onLoad();
                 } else _LOGGER_.error("Failed to load " + name);
             }
         }

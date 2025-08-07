@@ -62,8 +62,8 @@ int main() {
         serv::Server server(io_context, CONF.port, worker_pool, [&defaultHandler](Request& r) -> serv::Handler {
             serv::Handler h = {defaultHandler, false};
 
-            std::string main_route = r.uri.size() > 1 ? r.uri.substr(1, r.uri.find("/", 1)) : "";
-
+            std::string main_route = r.uri.size() > 1 ? r.uri.substr(1, r.uri.find("/", 1)-1) : "";
+            
             IPlugin* pl = _PLUGINS_::getPlugin(main_route);
             if(pl){
                 h.func = [pl](Request& request) -> Response { return pl->handle(request); };
