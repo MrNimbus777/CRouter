@@ -11,6 +11,7 @@
 #include <boost/beast.hpp>
 #include <deque>
 #include <iostream>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -51,6 +52,7 @@ class IPlugin {
    public:
     virtual Response handle(Request &) = 0;
     virtual bool isHeavy() = 0;
+    virtual void onLoad(){};
     IPlugin *setLogger(ILogger *logger) {
         this->_LOGGER_ = logger;
         return this;

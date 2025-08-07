@@ -27,6 +27,7 @@ const char* plugin_hpp = R"#(#ifndef PLUGIN_HPP
 #include <memory>
 #include <string>
 #include <vector>
+#include <functional>
 
 #include "request.hpp"
 
@@ -60,6 +61,7 @@ class IPlugin {
    public:
     virtual Response handle(Request&) = 0;
     virtual bool isHeavy() = 0;
+    virtual void onLoad(){};
     virtual ~IPlugin() = default;
 
    protected:

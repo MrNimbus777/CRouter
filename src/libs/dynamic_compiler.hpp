@@ -35,7 +35,7 @@ std::string compileFile(const std::string& path) {
             file.close();
         }
         
-        _LOGGER_.log("Compiling " + entry.filename().string() + "...");
+        _LOGGER_.log("Compiling " + entry.filename().string() + "...\n" + compileCmd);
         if (std::system(compileCmd.c_str()) != 0) {
             _LOGGER_.error("Compilation failed for: " + path);
             return "";
@@ -56,7 +56,10 @@ PluginInstance loadFunctions(const std::string& dllPath, const std::vector<std::
 
     HMODULE lib = LoadLibraryA(dllPath.c_str());
     if (!lib) {
-        _LOGGER_.error("Failed to load DLL: " + dllPath);
+        DWORD err = GetLastError();
+        std::ostringstream oss;
+        oss << "Failed to load DLL: " << dllPath << ", error code: " << err;
+        _LOGGER_.error(oss.str());
         return result;
     }
     result.library = lib;
