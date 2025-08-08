@@ -72,75 +72,59 @@ class Session : public std::enable_shared_from_this<Session> {
                         return;
                     }
                     if (!ec) {
-                        std::string full_request_content(
+                        // Step 1: Copy headers
+                        std::string headers_str(
                             boost::asio::buffers_begin(self->request_buffer_.data()),
-                            boost::asio::buffers_begin(self->request_buffer_.data()) + self->request_buffer_.size());
-                        self->request_buffer_.consume(self->request_buffer_.size());
+                            boost::asio::buffers_begin(self->request_buffer_.data()) + length);
 
-                        _LOGGER_.log("Request received:\n" + (full_request_content.length() > 512 && false ? (full_request_content.substr(0, (size_t)512) + " (. . .)") : full_request_content));
-
-                        Request req = Request::parse(full_request_content);
-                        Handler handler = self->handler_builder_(req);
-
-                        auto func = handler.func;
-                        if (handler.isHeavy) {
-                            boost::asio::post(self->worker_pool_, [self, &req, func]() {
-                                try {
-                                    Response res_obj;
-                                    {
-                                        std::lock_guard<std::mutex> lock(self->mtx);
-                                        _WEBSOCKETS_.request_sockets[&req] = self;
-                                        res_obj = func(req);
-                                        if(_WEBSOCKETS_.request_sockets.find(&req) == _WEBSOCKETS_.request_sockets.end()) return;
-                                        _WEBSOCKETS_.request_sockets.erase(&req);
+                        // Step 2: Parse Content-Length (if present)
+                        std::size_t content_length = 0;
+                        {
+                            std::istringstream header_stream(headers_str);
+                            std::string line;
+                            while (std::getline(header_stream, line) && line != "\r") {
+                                if (line.find("Content-Length:") != std::string::npos) {
+                                    try {
+                                        content_length = static_cast<std::size_t>(std::stoul(
+                                            line.substr(line.find(":") + 1)));
+                                    } catch (...) {
+                                        content_length = 0;
                                     }
-                                    std::string response_str = res_obj.toString();
-
-                                    boost::asio::post(self->strand_, [self, response_str]() {
-                                        self->do_write(response_str);
-                                    });
-                                } catch (const std::exception& ex) {
-                                    _LOGGER_.error("Error processing request: " + std::string(ex.what()));
-                                    std::string error_response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
-                                    boost::asio::post(self->strand_, [self, error_response]() {
-                                        boost::asio::async_write(self->socket_, boost::asio::buffer(error_response),
-                                            [self](boost::system::error_code write_ec, std::size_t) {
-                                                if (write_ec) {
-                                                    _LOGGER_.error("Error sending response: " + write_ec.message() + " (Error code: " + std::to_string(write_ec.value()) + ")");
-                                                }
-                                                self->do_close();
-                                            });
-                                    });
                                 }
-                            });
-                        } else {
-                            try {
-                                Response res_obj;
-                                {
-                                    std::lock_guard<std::mutex> lock(self->mtx);
-                                    _WEBSOCKETS_.request_sockets[&req] = self;
-                                    res_obj = func(req);
-                                    if(_WEBSOCKETS_.request_sockets.find(&req) == _WEBSOCKETS_.request_sockets.end()) return;
-                                    _WEBSOCKETS_.request_sockets.erase(&req);
-                                }
-                                std::string response_str = res_obj.toString();
-
-                                boost::asio::post(self->strand_, [self, response_str]() {
-                                    self->do_write(response_str);
-                                });
-                            } catch (const std::exception& ex) {
-                                _LOGGER_.error("Error processing request: " + std::string(ex.what()));
-                                std::string error_response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
-                                boost::asio::post([self, error_response]() {
-                                    boost::asio::async_write(self->socket_, boost::asio::buffer(error_response),
-                                        [self](boost::system::error_code write_ec, std::size_t) {
-                                            if (write_ec) {
-                                                _LOGGER_.error("Error sending response: " + write_ec.message() + " (Error code: " + std::to_string(write_ec.value()) + ")");
-                                            }
-                                            self->do_close();
-                                        });
-                                });
                             }
+                        }
+
+                        // Bytes after the headers already in buffer
+                        std::size_t already_in_buffer = self->request_buffer_.size() - length;
+
+                        // Step 3: If there is a body, read the rest
+                        if (content_length > already_in_buffer) {
+                            boost::asio::async_read(self->socket_.socket(),
+                                self->request_buffer_,
+                                boost::asio::transfer_exactly(content_length - already_in_buffer),
+                                boost::asio::bind_executor(self->strand_,
+                                    [self](boost::system::error_code ec, std::size_t) {
+                                        if (!ec) {
+                                            // Now we have headers + full body
+                                            std::string full_request_content(
+                                                boost::asio::buffers_begin(self->request_buffer_.data()),
+                                                boost::asio::buffers_end(self->request_buffer_.data()));
+                                            self->request_buffer_.consume(self->request_buffer_.size());
+
+                                            self->process_full_request(full_request_content);
+                                        } else {
+                                            _LOGGER_.error("Error reading request body: " + ec.message());
+                                            self->do_close();
+                                        }
+                                    }));
+                        } else {
+                            // No extra read needed (body already in buffer or no body)
+                            std::string full_request_content(
+                                boost::asio::buffers_begin(self->request_buffer_.data()),
+                                boost::asio::buffers_end(self->request_buffer_.data()));
+                            self->request_buffer_.consume(self->request_buffer_.size());
+
+                            self->process_full_request(full_request_content);
                         }
                     } else {
                         if (ec == boost::asio::error::timed_out) {
@@ -159,6 +143,75 @@ class Session : public std::enable_shared_from_this<Session> {
                     }
                 }));
     }
+
+    void process_full_request(const std::string &full_request_content) {
+        _LOGGER_.log("Request received:\n" + (full_request_content.length() > 512 && false
+            ? (full_request_content.substr(0, 512) + " (. . .)")
+            : full_request_content));
+
+        Request req = Request::parse(full_request_content);
+        Handler handler = handler_builder_(req);
+        auto func = handler.func;
+
+        if (handler.isHeavy) {
+            boost::asio::post(worker_pool_, [self = shared_from_this(), req = std::move(req), func]() mutable {
+                try {
+                    Response res_obj;
+                    {
+                        std::lock_guard<std::mutex> lock(self->mtx);
+                        _WEBSOCKETS_.request_sockets[&req] = self;
+                        res_obj = func(req);
+                        if (_WEBSOCKETS_.request_sockets.find(&req) == _WEBSOCKETS_.request_sockets.end()) return;
+                        _WEBSOCKETS_.request_sockets.erase(&req);
+                    }
+                    std::string response_str = res_obj.toString();
+                    boost::asio::post(self->strand_, [self, response_str]() {
+                        self->do_write(response_str);
+                    });
+                } catch (const std::exception &ex) {
+                    _LOGGER_.error("Error processing request: " + std::string(ex.what()));
+                    std::string error_response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
+                    boost::asio::post(self->strand_, [self, error_response]() {
+                        boost::asio::async_write(self->socket_, boost::asio::buffer(error_response),
+                            [self](boost::system::error_code write_ec, std::size_t) {
+                                if (write_ec) {
+                                    _LOGGER_.error("Error sending response: " + write_ec.message() + " (Error code: " + std::to_string(write_ec.value()) + ")");
+                                }
+                                self->do_close();
+                            });
+                    });
+                }
+            });
+        } else {
+            try {
+                Response res_obj;
+                {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    _WEBSOCKETS_.request_sockets[&req] = shared_from_this();
+                    res_obj = func(req);
+                    if (_WEBSOCKETS_.request_sockets.find(&req) == _WEBSOCKETS_.request_sockets.end()) return;
+                    _WEBSOCKETS_.request_sockets.erase(&req);
+                }
+                std::string response_str = res_obj.toString();
+                boost::asio::post(strand_, [self = shared_from_this(), response_str]() {
+                    self->do_write(response_str);
+                });
+            } catch (const std::exception &ex) {
+                _LOGGER_.error("Error processing request: " + std::string(ex.what()));
+                std::string error_response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
+                boost::asio::post([self = shared_from_this(), error_response]() {
+                    boost::asio::async_write(self->socket_, boost::asio::buffer(error_response),
+                        [self](boost::system::error_code write_ec, std::size_t) {
+                            if (write_ec) {
+                                _LOGGER_.error("Error sending response: " + write_ec.message() + " (Error code: " + std::to_string(write_ec.value()) + ")");
+                            }
+                            self->do_close();
+                        });
+                });
+            }
+        }
+    }
+
 
     void do_write(const std::string& response) {
         if (!socket_.socket().is_open()) {
