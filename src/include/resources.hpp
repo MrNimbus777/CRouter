@@ -9,7 +9,7 @@ DEFAULT_REQUEST_HANDLER=true
 # Primitive routing. Part of default request handler. If true, get requests to a url such us your.host.com/example will return the file ./public/example.html
 HTML_ROUTING=true
 # Caches the most used static files. Up to 16 MB. This way 
-CATCHE=true
+CACHE=true
 #</SETTINGS RELATED TO THE DEFAULT HANDLER>
 
 # Debug mode not implemented yet
