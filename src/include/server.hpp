@@ -72,12 +72,10 @@ class Session : public std::enable_shared_from_this<Session> {
                         return;
                     }
                     if (!ec) {
-                        // Step 1: Copy headers
                         std::string headers_str(
                             boost::asio::buffers_begin(self->request_buffer_.data()),
                             boost::asio::buffers_begin(self->request_buffer_.data()) + length);
 
-                        // Step 2: Parse Content-Length (if present)
                         std::size_t content_length = 0;
                         {
                             std::istringstream header_stream(headers_str);
@@ -94,10 +92,8 @@ class Session : public std::enable_shared_from_this<Session> {
                             }
                         }
 
-                        // Bytes after the headers already in buffer
                         std::size_t already_in_buffer = self->request_buffer_.size() - length;
 
-                        // Step 3: If there is a body, read the rest
                         if (content_length > already_in_buffer) {
                             boost::asio::async_read(self->socket_.socket(),
                                 self->request_buffer_,
@@ -105,7 +101,6 @@ class Session : public std::enable_shared_from_this<Session> {
                                 boost::asio::bind_executor(self->strand_,
                                     [self](boost::system::error_code ec, std::size_t) {
                                         if (!ec) {
-                                            // Now we have headers + full body
                                             std::string full_request_content(
                                                 boost::asio::buffers_begin(self->request_buffer_.data()),
                                                 boost::asio::buffers_end(self->request_buffer_.data()));
@@ -118,7 +113,6 @@ class Session : public std::enable_shared_from_this<Session> {
                                         }
                                     }));
                         } else {
-                            // No extra read needed (body already in buffer or no body)
                             std::string full_request_content(
                                 boost::asio::buffers_begin(self->request_buffer_.data()),
                                 boost::asio::buffers_end(self->request_buffer_.data()));

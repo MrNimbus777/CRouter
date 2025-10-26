@@ -92,23 +92,83 @@ inline std::string replace_all(const std::string &str, const std::string &from, 
 }
 }  // namespace __PLUGIN_HELPER__
 
+#ifdef _WIN32
+#include <windows.h>
+void hideCursor() {
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_CURSOR_INFO cursorInfo;
+    GetConsoleCursorInfo(hConsole, &cursorInfo);
+    cursorInfo.bVisible = FALSE;
+    SetConsoleCursorInfo(hConsole, &cursorInfo);
+}
+void showCursor(){
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_CURSOR_INFO cursorInfo;
+    GetConsoleCursorInfo(hConsole, &cursorInfo);
+    cursorInfo.bVisible = TRUE;
+    SetConsoleCursorInfo(hConsole, &cursorInfo);
+}
+void enableANSI() {
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hOut == INVALID_HANDLE_VALUE) return;
+
+    DWORD dwMode = 0;
+    if (!GetConsoleMode(hOut, &dwMode)) return;
+
+    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    SetConsoleMode(hOut, dwMode);
+}
+#else
+#include <unistd.h>
+#include <termios.h>
+#include <stdio.h>
+void hideCursor() {
+    std::cout << "\e[?25l" << std::flush;
+}
+void showCursor(){
+    std::cout << "\e[?25h" << std::flush;
+}
+void enableANSI() {}
+#endif
+
 class Logger : public ILogger {
    public:
+    Logger(){
+        std::cout << "\n\n";
+    }
+    void commandLine(const std::string& cmd){
+        if(!to_print) return;
+        std::lock_guard<std::mutex> lock(mutex_);
+        hideCursor();
+        std::cout << "\r> " << cmd;
+        showCursor();
+        to_print = false;
+    }
     void log(const std::string &message) override {
         std::lock_guard<std::mutex> lock(mutex_);
-        std::cout << "\033[0m[" << __PLUGIN_HELPER__::getTime() << "][T" << std::this_thread::get_id() << "] " << __PLUGIN_HELPER__::replace_all(message, "\n", "\n    ") << "\033[0m\n";
+        std::cout << "\r" << clrl << upl << clrl << upl << "\033[0m[" << __PLUGIN_HELPER__::getTime() << "][T" << std::this_thread::get_id() << "] " << __PLUGIN_HELPER__::replace_all(message, "\n", "\n    ") << "\033[0m\n\n\n";
+        to_print = true;
     }
     void warning(const std::string &message) override {
         std::lock_guard<std::mutex> lock(mutex_);
-        std::cout << "\033[0m[" << __PLUGIN_HELPER__::getTime() << "][T" << std::this_thread::get_id() << "] \033[34m[WARNING] " << __PLUGIN_HELPER__::replace_all(message, "\n", "\n    ") << "\033[0m\n";
+        std::cout << "\r" << clrl << upl << clrl << upl << "\033[0m[" << __PLUGIN_HELPER__::getTime() << "][T" << std::this_thread::get_id() << "] \033[34m[WARNING] " << __PLUGIN_HELPER__::replace_all(message, "\n", "\n    ") << "\033[0m\n\n\n";
+        showCursor();
+        to_print = true;
     }
     void error(const std::string &message) override {
         std::lock_guard<std::mutex> lock(mutex_);
-        std::cout << "\033[0m[" << __PLUGIN_HELPER__::getTime() << "][T" << std::this_thread::get_id() << "] \033[31m[ERROR] " << __PLUGIN_HELPER__::replace_all(message, "\n", "\n    ") << "\033[0m\n";
+        std::cout << "\r" << clrl << upl << clrl << upl << "\033[0m[" << __PLUGIN_HELPER__::getTime() << "][T" << std::this_thread::get_id() << "] \033[31m[ERROR] " << __PLUGIN_HELPER__::replace_all(message, "\n", "\n    ") << "\033[0m\n\n\n";
+        to_print = true;
+    }
+    void update(){
+        to_print = true;
     }
 
    private:
+    bool to_print = true;
     std::mutex mutex_;
+    inline static const char* upl = "\033[A";
+    inline static const char* clrl = "\033[2K";
 };
 
 Logger _LOGGER_;

@@ -1,16 +1,19 @@
 #pragma once
 const char* _env =
-    R"#(#Server
-SERVER_PORT=8080
+    R"#(SERVER_PORT=8080
 
 #<SETTINGS RELATED TO THE DEFAULT HANDLER>
 # If true, the app will use the default request handler. Otherwise, it will generate a new .cpp file with a function that you need to complete as needed. 
 DEFAULT_REQUEST_HANDLER=true
-# Primitive routing. Part of default request handler. If true, get requests to a url such us your.host.com/example will return the file ./public/example.html
+# Primitive routing. Part of default request handler. If true, get requests to a url such us your.host.com/example -> ./public/example.html, your.host.com/ -> ./public/index.html
 HTML_ROUTING=true
-# Caches the most used static files. Up to 16 MB. This way 
+# Caches the most used static files (default 64 MB).
 CACHE=true
+CACHE_SIZE_KB=65356
 #</SETTINGS RELATED TO THE DEFAULT HANDLER>
+
+#If DEFAULT_REQUEST_HANDLER=false, then program will look for a handler from ./app/handlers/. E.g. CUSTOM_DEFAULT_HANDLER=my_handler -> ./app/handlers/my_handler.cpp
+CUSTOM_DEFAULT_HANDLER=none
 
 # Debug mode not implemented yet
 DEBUG_MODE=false)#";

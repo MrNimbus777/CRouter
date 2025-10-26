@@ -16,7 +16,11 @@ struct Config {
     // Plugin Loader
     bool default_request_handler = true;
     bool cache = true;
+    bool cache_size_kb = 65356;
     bool html_routing = true;
+
+    //CUSTOM_DEFAULT_HANDLER
+    std::string custom_default_handler = "none";
 
 
     //Debugging
@@ -70,6 +74,10 @@ void loadConfig(Config& config, const std::string& filename) {
     if(env.count("CACHE")) 
         config.cache = 
             (env.at("CACHE") == "true" || env.at("CACHE") == "1");
+    if (env.count("CACHE_SIZE_KB"))
+        config.cache_size_kb = std::stoi(env.at("CACHE_SIZE_KB"));
+    if (env.count("CUSTOM_DEFAULT_HANDLER"))
+        config.custom_default_handler = env.at("CUSTOM_DEFAULT_HANDLER");
     if(env.count("HTML_ROUTING")) 
         config.html_routing = 
             (env.at("HTML_ROUTING") == "true" || env.at("HTML_ROUTING") == "1");

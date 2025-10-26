@@ -1,28 +1,14 @@
 #include <iostream>
+#include <chrono>
 
-#include "server.hpp"
-#include "config.hpp"
-#include "default_request_handler.hpp"
-#include "defaults.hpp"
-#include "plugin_loader.hpp"
+#include <server.hpp>
+#include <config.hpp>
+#include <default_request_handler.hpp>
+#include <defaults.hpp>
+#include <plugin_loader.hpp>
+#include <command.hpp>
+#include <lib_wrapper.hpp>
 
-#ifdef _WIN32
-#include <windows.h>
-void enableANSI() {
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (hOut == INVALID_HANDLE_VALUE) return;
-
-    DWORD dwMode = 0;
-    if (!GetConsoleMode(hOut, &dwMode)) return;
-
-    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-    SetConsoleMode(hOut, dwMode);
-}
-#else
-void enableANSI() {}
-#endif
-
-Logger logger;
 
 int main() {
     enableANSI();
@@ -31,36 +17,52 @@ int main() {
 
     loadConfig(CONF, "./.env");
 
-    _PLUGINS_::loadPlugins("app/handlers");
+    _PLUGINS_::loadPlugins("./app/handlers");
 
-    PluginInstance default_handler_instance = {std::unordered_map<std::string, void*>(), nullptr};
+    std::unique_ptr<LibWraper> def_lib = nullptr;
+
     std::function<Response(Request&)> defaultHandler = nullptr;
+    bool defaultHeavy = false;
     if (CONF.default_request_handler) {
+        _default_req_handler::load();
         defaultHandler = _default_req_handler::func;
     } else {
-        if (!std::filesystem::exists("./app/custom_default_request_handler.cpp")) {
-            std::ofstream out("./app/custom_default_request_handler.cpp");
-            out << custom_default_request_handler_cpp;
-            out.close();
-            return 0;
-        }
-        try {
-            PluginInstance default_handler_instance = loadFunctions(compileFile("./app/custom_default_request_handler.cpp"), {"handle"});
-            defaultHandler = (std::function<Response(Request&)>)reinterpret_cast<Response (*)(Request&)>(default_handler_instance.functions_map["handle"]);
-        } catch (std::exception e) {
-            logger.error("Failed to compile and load the custom_default_request_handler.cpp (" + std::string(e.what()) + ")");
+        auto it = _PLUGINS_::loadedPlugins.find(CONF.custom_default_handler);
+        if(it != _PLUGINS_::loadedPlugins.end()){
+            def_lib = std::move(it->second.lib);
+            auto* p = it->second.instance;
+            defaultHandler = [p](Request& req) -> Response {
+                return p->handle(req);
+            };
+            defaultHeavy = p->isHeavy();
+            _PLUGINS_::loadedPlugins.erase(it);
+            _LOGGER_.log("Custom handler " + CONF.custom_default_handler + "loaded successfully.");
+        } else {
+            _LOGGER_.error("Failed to find the custom handler " + CONF.custom_default_handler);
+            _default_req_handler::load();
             defaultHandler = _default_req_handler::func;
         }
     }
 
+
+    boost::asio::io_context io;
+    CommandExecutor exe(io);
+    
     try {
         boost::asio::io_context io_context;
         boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard(io_context.get_executor());
 
+        Command exit_cmd("exit", [&io_context, &io](Command::Arguments) {
+            io.stop();
+            io_context.stop();
+        });
+        exe.register_(exit_cmd);
+    
+
         boost::asio::thread_pool worker_pool(4);
 
-        serv::Server server(io_context, CONF.port, worker_pool, [&defaultHandler](Request& r) -> serv::Handler {
-            serv::Handler h = {defaultHandler, false};
+        serv::Server server(io_context, CONF.port, worker_pool, [&defaultHandler, &defaultHeavy](Request& r) -> serv::Handler {
+            serv::Handler h = {defaultHandler, defaultHeavy};
 
             std::string main_route = r.uri.size() > 1 ? r.uri.substr(1, r.uri.find("/", 1)-1) : "";
             
@@ -72,6 +74,45 @@ int main() {
 
             return h;
         });
+        exe.register_(Command("reload", [&def_lib, &defaultHandler, &defaultHeavy](Command::Arguments args) {
+            _LOGGER_.log("Reloading ./.env . . .");
+            loadConfig(CONF, "./.env");
+            _LOGGER_.log("Reloaded ./.env");
+            
+            def_lib = nullptr;
+            defaultHandler = nullptr;
+            defaultHeavy = false;
+
+            _LOGGER_.log("Reloading ./app/handlers/ . . .");
+            _PLUGINS_::clear();
+            _PLUGINS_::loadPlugins("./app/handlers");
+            _LOGGER_.log("Reloaded ./app/handlers/");
+            
+            _LOGGER_.log("Reloading default handler . . .");
+            if (CONF.default_request_handler) {
+                _default_req_handler::load();
+                defaultHandler = _default_req_handler::func;
+            } else {
+                auto it = _PLUGINS_::loadedPlugins.find(CONF.custom_default_handler);
+                if(it != _PLUGINS_::loadedPlugins.end()){
+                    def_lib = std::move(it->second.lib);
+                    auto* p = it->second.instance;
+                    defaultHandler = [p](Request& req) -> Response {
+                        return p->handle(req);
+                    };
+                    defaultHeavy = p->isHeavy();
+                    _PLUGINS_::loadedPlugins.erase(it);
+                    _LOGGER_.log("Custom handler " + CONF.custom_default_handler + "loaded successfully.");
+                } else {
+                    _LOGGER_.error("Failed to find the custom handler " + CONF.custom_default_handler);
+                    _default_req_handler::load();
+                    defaultHandler = _default_req_handler::func;
+                }
+            }
+            _LOGGER_.log("Reloaded default handler");
+
+        }));
+
         _LOGGER_.log("Server listening on port " + std::to_string(server.getPort()));
 
         boost::asio::signal_set signals(io_context, SIGINT, SIGTERM);
@@ -89,7 +130,7 @@ int main() {
         std::vector<std::thread> io_threads;
         int io_thread_count = std::thread::hardware_concurrency();
         _LOGGER_.log("Starting " + std::to_string(io_thread_count) + " io_context threads...");
-        for (int i = 0; i < io_thread_count; ++i) {
+        for (int i = 0; i < io_thread_count; i++) {
             io_threads.emplace_back([&]() {
                 std::ostringstream oss;
                 oss << std::this_thread::get_id();
@@ -114,7 +155,7 @@ int main() {
     } catch (std::exception& e) {
         _LOGGER_.log("Exception in main: " + std::string(e.what()));
     }
-    freeLibrary(default_handler_instance);
+    exe.stop();
 
     return 0;
 }

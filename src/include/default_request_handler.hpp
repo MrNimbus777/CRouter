@@ -10,10 +10,18 @@
 #include "resources.hpp"
 #include "lru_map.hpp"
 
+
+
 namespace _default_req_handler {
-lru_map<std::string, std::string> cache([](std::string str) -> long {
-    return str.size();
-});
+lru_map<std::string, std::string>* cache = nullptr;
+void load(){
+    if(CONF.cache) {
+        cache = new lru_map<std::string, std::string>([](std::string str) -> long {
+            return str.size();
+        });
+    }
+}
+
 Response func(Request& req) {
     Response res;
 
@@ -65,9 +73,9 @@ Response func(Request& req) {
             }
 
             std::string content;
-            if(CONF.cache){
-                if(cache.exists(full_path.string())){
-                    content = cache.get(full_path.string());
+            if(cache){
+                if(cache->exists(full_path.string())){
+                    content = cache->get(full_path.string());
                 } else {
                     std::ifstream file(full_path, std::ios::in | std::ios::binary);
                     if (!file.is_open()) {
@@ -82,7 +90,7 @@ Response func(Request& req) {
                         content.resize(static_cast<std::string::size_type>(file_size));
                         file.read(&content[0], file_size);
                     }
-                    cache.put(full_path.string(), content);
+                    cache->put(full_path.string(), content);
                 }
             } else {
                 std::ifstream file(full_path, std::ios::in | std::ios::binary);
