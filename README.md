@@ -80,7 +80,7 @@ CRouter's routing system maps incoming request paths directly to handler plugins
 * This will trigger the plugin:
   `/app/handlers/some_route.cpp`
 
-Each plugin defines the logic for that route. On each request, CRouter dynamically loads and executes the plugin to handle it.
+Each plugin defines the logic for that route. The structure of plugin defines a freedom of structure, where you can implement any solution to your specific tasks.
 
 ---
 
