@@ -49,7 +49,7 @@ Make sure the following libraries are available before building:
    * Generate a sample **Hello World** page
    * Create an example plugin file: `/app/handlers/test.cpp`
 
-> **Note**: You must have `g++` installed (**Clang** recommended on Windows). The plugin system strictly depends on the `g++` command to compile handlers. Using other compilers may cause the plugin system to fail.
+> **Note**: You must have support of `g++` compile command (I use **Clang**). The plugin system strictly depends on the `g++` command to compile handlers. Using other compilers may cause the plugin system to fail.
 
 ---
 
@@ -57,7 +57,7 @@ Make sure the following libraries are available before building:
 
 Clone the repository and compile it using your favorite environment. Ensure all dependencies are installed, and that you're using **g++** as your compiler.
 
-Example:
+Example uning CMake:
 ```bash
 git clone https://github.com/MrNimbus777/CRouter.git
 cd CRouter

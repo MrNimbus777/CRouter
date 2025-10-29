@@ -45,7 +45,7 @@ public:
         if (!running_) return;
         running_ = false;
 #if defined(_WIN32)
-        if (readerThread_.joinable()) readerThread_.detach();
+        if (readerThread_.joinable()) readerThread_.join();
 #else
         if (input_ && input_->is_open()) input_->close();
         tcsetattr(STDIN_FILENO, TCSANOW, &oldt_);

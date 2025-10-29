@@ -109,7 +109,11 @@ int main() {
                     defaultHandler = _default_req_handler::func;
                 }
             }
-            _LOGGER_.log("Reloaded default handler");
+            _LOGGER_.log("Reloaded default handler\n");
+
+            _LOGGER_.log("!!!");
+            _LOGGER_.log("!!! Some configurations need a full restart in order to apply! (e.g. port)");
+            _LOGGER_.log("!!!\n");
 
         }));
 
