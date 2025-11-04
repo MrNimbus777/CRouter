@@ -90,7 +90,11 @@ Response func(Request& req) {
                         content.resize(static_cast<std::string::size_type>(file_size));
                         file.read(&content[0], file_size);
                     }
-                    cache->put(full_path.string(), content);
+                    try{
+                        cache->put(full_path.string(), content);
+                    } catch (const std::exception& e) {
+                        _LOGGER_.warning(e.what());
+                    }
                 }
             } else {
                 std::ifstream file(full_path, std::ios::in | std::ios::binary);
