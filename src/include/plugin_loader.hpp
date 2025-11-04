@@ -8,14 +8,11 @@
 namespace _PLUGINS_ {
     struct LibInstance{
         std::unique_ptr<LibWraper> lib = nullptr;
-        IPlugin* instance = nullptr;
+        std::shared_ptr<IPlugin> instance = nullptr;
         LibInstance(std::unique_ptr<LibWraper> l, IPlugin* p): lib(std::move(l)), instance(p) {}
     };
     std::unordered_map<std::string, LibInstance> loadedPlugins;
     void clear(){
-        for(auto& it : loadedPlugins){
-            delete it.second.instance;
-        }
         loadedPlugins.clear();
     }
     void loadPlugins(const std::string& dir){
@@ -38,7 +35,7 @@ namespace _PLUGINS_ {
             }
         }
     }
-    IPlugin* getPlugin(const std::string& pluginName) {
+    std::shared_ptr<IPlugin> getPlugin(const std::string& pluginName) {
         auto it = loadedPlugins.find(pluginName);
         if (it != loadedPlugins.end()) {
             return it->second.instance;

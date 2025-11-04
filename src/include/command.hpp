@@ -38,9 +38,9 @@ namespace std {
 class CommandExecutor {
 using Arguments = std::vector<std::string>;
 public:
-    CommandExecutor(boost::asio::io_context& io) : running_(true){
+    CommandExecutor(boost::asio::io_context& io) : io_(io), running_(true){
         auto reader = std::make_shared<AsyncCommandReader>(
-            io, [this](const std::string& cmd){
+            io_, [this](const std::string& cmd){
                 _LOGGER_.log("Command typed: " + cmd);
                 int space_1 = cmd.find(" ");
                 std::string name = cmd.substr(0, space_1);
@@ -93,8 +93,10 @@ public:
     }
     void stop(){
         running_ = false;
+        io_.stop();
     }
 private:
+    boost::asio::io_context& io_;
     std::unordered_set<Command> set_;
     std::atomic<bool> running_;
 };

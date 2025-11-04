@@ -20,6 +20,7 @@ int main() {
     _PLUGINS_::loadPlugins("./app/handlers");
 
     std::unique_ptr<LibWraper> def_lib = nullptr;
+    std::shared_ptr<IPlugin> p_instance = nullptr;
 
     std::function<Response(Request&)> defaultHandler = nullptr;
     bool defaultHeavy = false;
@@ -30,11 +31,11 @@ int main() {
         auto it = _PLUGINS_::loadedPlugins.find(CONF.custom_default_handler);
         if(it != _PLUGINS_::loadedPlugins.end()){
             def_lib = std::move(it->second.lib);
-            auto* p = it->second.instance;
-            defaultHandler = [p](Request& req) -> Response {
-                return p->handle(req);
+            p_instance = it->second.instance;
+            defaultHandler = [&p_instance](Request& req) -> Response {
+                return p_instance->handle(req);
             };
-            defaultHeavy = p->isHeavy();
+            defaultHeavy = p_instance->isHeavy();
             _PLUGINS_::loadedPlugins.erase(it);
             _LOGGER_.log("Custom handler " + CONF.custom_default_handler + "loaded successfully.");
         } else {
@@ -45,15 +46,15 @@ int main() {
     }
 
 
-    boost::asio::io_context io;
-    CommandExecutor exe(io);
+    boost::asio::io_context io_commands;
+    CommandExecutor exe(io_commands);
     
     try {
         boost::asio::io_context io_context;
         boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard(io_context.get_executor());
 
-        Command exit_cmd("exit", [&io_context, &io](Command::Arguments) {
-            io.stop();
+        Command exit_cmd("exit", [&io_context, &io_commands](Command::Arguments) {
+            io_commands.stop();
             io_context.stop();
         });
         exe.register_(exit_cmd);
@@ -66,15 +67,15 @@ int main() {
 
             std::string main_route = r.uri.size() > 1 ? r.uri.substr(1, r.uri.find("/", 1)-1) : "";
             
-            IPlugin* pl = _PLUGINS_::getPlugin(main_route);
+            auto pl = _PLUGINS_::getPlugin(main_route);
             if(pl){
-                h.func = [pl](Request& request) -> Response { return pl->handle(request); };
+                h.func = [&pl](Request& request) -> Response { return pl->handle(request); };
                 h.isHeavy = pl->isHeavy();
             }
 
             return h;
         });
-        exe.register_(Command("reload", [&def_lib, &defaultHandler, &defaultHeavy](Command::Arguments args) {
+        exe.register_(Command("reload", [&def_lib, &defaultHandler, &defaultHeavy, &p_instance](Command::Arguments args) {
             _LOGGER_.log("Reloading ./.env . . .");
             loadConfig(CONF, "./.env");
             _LOGGER_.log("Reloaded ./.env");
@@ -96,11 +97,11 @@ int main() {
                 auto it = _PLUGINS_::loadedPlugins.find(CONF.custom_default_handler);
                 if(it != _PLUGINS_::loadedPlugins.end()){
                     def_lib = std::move(it->second.lib);
-                    auto* p = it->second.instance;
-                    defaultHandler = [p](Request& req) -> Response {
-                        return p->handle(req);
+                    p_instance = it->second.instance;
+                    defaultHandler = [&p_instance](Request& req) -> Response {
+                        return p_instance->handle(req);
                     };
-                    defaultHeavy = p->isHeavy();
+                    defaultHeavy = p_instance->isHeavy();
                     _PLUGINS_::loadedPlugins.erase(it);
                     _LOGGER_.log("Custom handler " + CONF.custom_default_handler + "loaded successfully.");
                 } else {
@@ -145,7 +146,7 @@ int main() {
             });
         }
 
-        _LOGGER_.log("Main thread participating in io_context.run()...");
+        _LOGGER_.log("\033[32mMain thread participating in io_context.run()...");
         io_context.run();
 
         _LOGGER_.log("io_context has stopped. Waiting for all IO threads to finish...");
@@ -159,7 +160,9 @@ int main() {
     } catch (std::exception& e) {
         _LOGGER_.log("Exception in main: " + std::string(e.what()));
     }
+    _LOGGER_.log("1");
     exe.stop();
+    _LOGGER_.log("2");
 
     return 0;
 }
