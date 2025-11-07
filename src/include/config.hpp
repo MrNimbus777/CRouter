@@ -62,7 +62,8 @@ std::unordered_map<std::string, std::string> parseEnvFile(const std::string& fil
 }   
 }
 
-void loadConfig(Config& config, const std::string& filename) {
+void loadConfig(const std::string& filename) {
+    Config& config = CONF;
     const std::unordered_map<std::string, std::string> env = env_parser::parseEnvFile(filename);
     if (env.count("SERVER_PORT"))
         config.port = std::stoi(env.at("SERVER_PORT"));
