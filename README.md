@@ -46,10 +46,10 @@ Make sure the following libraries are available before building:
 2. Run the executable. On first launch, it will:
 
    * Start a basic web server
-   * Generate a sample **Hello World** page
+   * Generate a sample **Hello World** html page
    * Create an example plugin file: `/app/handlers/test.cpp`
 
-> **Note**: You must have support of `g++` compile command (I use **Clang**). The plugin system strictly depends on the `g++` command to compile handlers. Using other compilers may cause the plugin system to fail.
+> **Note**: Check the .env file and make sure to set at "CMP_COMMAND" a command that runs on your Operating System.
 
 ---
 
@@ -80,7 +80,7 @@ CRouter's routing system maps incoming request paths directly to handler plugins
 * This will trigger the plugin:
   `/app/handlers/some_route.cpp`
 
-Each plugin defines the logic for that route. The structure of plugin defines a freedom of structure, where you can implement any solution to your specific tasks.
+Each plugin defines the logic for that route. The structure of plugin defines a freedom, where you can implement any solution to your specific tasks.
 
 ---
 
