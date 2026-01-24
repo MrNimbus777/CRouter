@@ -67,13 +67,15 @@ int main() {
         boost::asio::thread_pool worker_pool(4);
 
         serv::Server server(io_context, config.port, worker_pool, [&defaultHandler, &defaultHeavy](Request& r) -> serv::Handler {
-            serv::Handler h = {defaultHandler, defaultHeavy};
+            serv::Handler h{defaultHandler, defaultHeavy};
 
             std::string main_route = r.uri.size() > 1 ? r.uri.substr(1, r.uri.find("/", 1)-1) : "";
             
-            auto pl = _PLUGINS_::getPlugin(main_route);
+            auto* pl = _PLUGINS_::getPlugin(main_route);
             if(pl){
-                h.func = [&pl](Request& request) -> Response { return pl->handle(request); };
+                h.func = [pl](Request& request) -> Response {
+                    return pl->handle(request); 
+                };
                 h.isHeavy = pl->isHeavy();
             }
 

@@ -15,6 +15,9 @@ CACHE_SIZE_KB=65356
 #If DEFAULT_REQUEST_HANDLER=false, then program will look for a handler from ./app/handlers/. E.g. CUSTOM_DEFAULT_HANDLER=my_handler -> ./app/handlers/my_handler.cpp
 CUSTOM_DEFAULT_HANDLER=none
 
+#PLGUIN COMPILING COMMAND. Called when plugins are loaded. %dllPath% - Path where the plugin's dll will be saved, on linux -> %soPath%. %cppPath% - Path to .cpp source file.
+CMP_COMMAND=g++ -shared -fPIC -o "%dllPath%" "%cppPath%" -I"app/headers"
+
 # Debug mode not implemented yet
 DEBUG_MODE=false)#";
 
@@ -252,13 +255,26 @@ const char* test_cpp =
 
 class Plugin : public IPlugin {
    public:
+    void onLoad() override {
+        //Function called when the plugin is loaded and _LOGGER_ becomes valid. If you call _LOGGER_ or other IPlugin's pointer before this function (E.g. in constructor) it will be nullptr.
+        _LOGGER_->warning("test.cpp has not been edited!");
+    }
     Response handle(Request& request) override {
-        _LOGGER_->warning("/app/handlers/test.cpp was not edited!");
-        std::string content = R"(<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Document</title></head><body><h1>Hello World</h1></body></html>)";
-
-        Response response;
-        response.setHeader("Content-Type", "text/html");
-        response.setBody(content);
+        Response response(200, "Everything Ok, brother!");
+        response.setBody(
+R"(<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test</title>
+</head>
+<body>
+    Test World!
+</body>
+</html>)"
+        );
+        response.setContentType("text/html");
         return response;
     }
     bool isHeavy() override {

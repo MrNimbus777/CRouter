@@ -151,7 +151,7 @@ class Logger : public ILogger {
     }
     void warning(const std::string &message) override {
         std::lock_guard<std::mutex> lock(mutex_);
-        std::cout << "\r" << clrl << upl << clrl << upl << "\033[0m[" << __PLUGIN_HELPER__::getTime() << "][T" << std::this_thread::get_id() << "] \033[33m[WhuiRNING] " << __PLUGIN_HELPER__::replace_all(message, "\n", "\n    ") << "\033[0m\n\n\n";
+        std::cout << "\r" << clrl << upl << clrl << upl << "\033[0m[" << __PLUGIN_HELPER__::getTime() << "][T" << std::this_thread::get_id() << "] \033[33m[WARNING] " << __PLUGIN_HELPER__::replace_all(message, "\n", "\n    ") << "\033[0m\n\n\n";
         showCursor();
         to_print = true;
     }

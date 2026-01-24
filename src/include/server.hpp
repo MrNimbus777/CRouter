@@ -139,7 +139,7 @@ class Session : public std::enable_shared_from_this<Session> {
     }
 
     void process_full_request(const std::string &full_request_content) {
-        _LOGGER_.log("Request received:\n" + (full_request_content.length() > 512 && false
+        _LOGGER_.log("Request received:\n" + (full_request_content.length() > 512
             ? (full_request_content.substr(0, 512) + " (. . .)")
             : full_request_content));
 

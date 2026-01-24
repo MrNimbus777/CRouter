@@ -22,23 +22,28 @@ namespace _PLUGINS_ {
             try{
                 auto lib = std::make_unique<LibWraper>(entry.path().string());
                 auto lib_ptr = lib.get();
-                loadedPlugins.emplace(
+                auto inserted = loadedPlugins.emplace(
                     lib_ptr->getName(),
                     std::move(LibInstance{
                         std::move(lib),
                         lib_ptr->loadAndGetProcedure<IPlugin*()>("create")()
                         ->setLogger(&_LOGGER_)->setWSM(&_WEBSOCKETS_)
                     }));
-                _LOGGER_.log("Loaded plugin: " + lib_ptr->getName());
+                    if(inserted.second){
+                        inserted.first->second.instance->onLoad();
+                        _LOGGER_.log("Loaded plugin: " + lib_ptr->getName());
+                        continue;
+                    }
+                    _LOGGER_.error("Failed to load " + entry.path().string());
             } catch(const std::exception& e){
                 _LOGGER_.error("Failed to load " + entry.path().string() + ": " + e.what());
             }
         }
     }
-    std::shared_ptr<IPlugin> getPlugin(const std::string& pluginName) {
+    IPlugin* getPlugin(const std::string& pluginName) {
         auto it = loadedPlugins.find(pluginName);
         if (it != loadedPlugins.end()) {
-            return it->second.instance;
+            return it->second.instance.get();
         }
         return nullptr;
     }

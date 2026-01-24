@@ -9,6 +9,7 @@
 
 #include "plugin.hpp"
 
+
 struct Config {
     // Server
     int port = 8080;
@@ -16,12 +17,14 @@ struct Config {
     // Plugin Loader
     bool default_request_handler = true;
     bool cache = true;
-    bool cache_size_kb = 65356;
+    int cache_size_kb = 65356;
     bool html_routing = true;
 
     //CUSTOM_DEFAULT_HANDLER
     std::string custom_default_handler = "none";
 
+    //PLGUIN COMPILING COMMAND
+    std::string cmp_command = R"(g++ -shared -fPIC -o %dllPath% %cppPath% -I"app/headers")";
 
     //Debugging
     bool debug_mode = false;
@@ -62,26 +65,55 @@ std::unordered_map<std::string, std::string> parseEnvFile(const std::string& fil
 }   
 }
 
+template <typename T>
+bool parse(T& val, const std::string& str_val) {
+    std::istringstream iss(str_val);
+    T temp;
+    if (!(iss >> temp)) {
+        return false;
+    }
+    val = temp;
+    return true;
+}
+template <>
+bool parse(bool& val, const std::string& str_val) {
+    if (str_val == "true" || str_val == "1") {
+        val = true;
+        return true;
+    } else if (str_val == "false" || str_val == "0") {
+        val = false;
+        return true;
+    }
+    return false;
+}
+template <>
+bool parse<std::string>(std::string& val, const std::string& str_val) {
+    val = str_val;
+    return true;
+}
+
+template<typename T>
+void parseEnv(T& val, const std::unordered_map<std::string, std::string>& env, const std::string& key){
+    if(auto it = env.find(key); it != env.end()) parse(val, it->second);
+}
+
 void loadConfig(const std::string& filename) {
     Config& config = CONF;
+    
     const std::unordered_map<std::string, std::string> env = env_parser::parseEnvFile(filename);
-    if (env.count("SERVER_PORT"))
-        config.port = std::stoi(env.at("SERVER_PORT"));
-    if(env.count("DEBUG_MODE")) 
-        config.debug_mode = (env.at("DEBUG_MODE") == "true" || env.at("DEBUG_MODE") == "1");
-    if(env.count("DEFAULT_REQUEST_HANDLER")) 
-        config.default_request_handler = 
-            (env.at("DEFAULT_REQUEST_HANDLER") == "true" || env.at("DEFAULT_REQUEST_HANDLER") == "1");
-    if(env.count("CACHE")) 
-        config.cache = 
-            (env.at("CACHE") == "true" || env.at("CACHE") == "1");
-    if (env.count("CACHE_SIZE_KB"))
-        config.cache_size_kb = std::stoi(env.at("CACHE_SIZE_KB"));
-    if (env.count("CUSTOM_DEFAULT_HANDLER"))
-        config.custom_default_handler = env.at("CUSTOM_DEFAULT_HANDLER");
-    if(env.count("HTML_ROUTING")) 
-        config.html_routing = 
-            (env.at("HTML_ROUTING") == "true" || env.at("HTML_ROUTING") == "1");
+    
+    parseEnv(config.port, env, "SERVER_PORT");
+    
+    parseEnv(config.default_request_handler, env, "DEFAULT_REQUEST_HANDLER");
+    parseEnv(config.cache, env, "CACHE");
+    parseEnv(config.cache_size_kb, env, "CACHE_SIZE_KB");
+    parseEnv(config.html_routing, env, "HTML_ROUTING");
+
+    parseEnv(config.custom_default_handler, env, "CUSTOM_DEFAULT_HANDLER");
+    
+    parseEnv(config.cmp_command, env, "CMP_COMMAND");
+
+    parseEnv(config.cache, env, "DEBUG_MODE");
 }
 
 #endif

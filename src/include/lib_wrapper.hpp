@@ -7,13 +7,16 @@
 #include <string>
 #include <unordered_map>
 #include <stdexcept>
-#include "plugin.hpp"
+#include <plugin.hpp>
+#include <config.hpp>
 
 #ifdef _WIN32
 
 #include <windows.h>
 
 class LibWraper{
+ private:
+    const Config& config = CONF;
  public:
     explicit LibWraper(const std::string& path2source){
         std::filesystem::path entry;
@@ -28,8 +31,9 @@ class LibWraper{
         name = entry.stem().string();
         std::filesystem::path dllPath = entry.parent_path() / (name + ".dll");
 
-        std::string compileCmd =
-            "g++ -shared -fPIC -o \"" + dllPath.string()  + "\" \"" + entry.string() + "\" -I\"app/headers\"";
+        _LOGGER_.log(config.cmp_command);
+
+        std::string compileCmd = __PLUGIN_HELPER__::replace_all(__PLUGIN_HELPER__::replace_all(config.cmp_command, "%cppPath%", entry.string()), "%dllPath%", dllPath.string());
         
         std::ifstream file(entry.string());
         std::string line;
@@ -37,6 +41,7 @@ class LibWraper{
         if (file.is_open()) {
             std::getline(file, line);
             if(line.find("//cmp:") == 0) compileCmd.append(" ").append(line.substr(6));
+            if(line.find("// cmp:") == 0) compileCmd.append(" ").append(line.substr(7));
             file.close();
         }
         
@@ -94,6 +99,8 @@ class LibWraper{
 #include <cstdlib>
 
 class LibWrapper {
+ private:
+    const Config& config = CONF;
 public:
     explicit LibWrapper(const std::string& path2source) {
         namespace fs = std::filesystem;
@@ -111,15 +118,14 @@ public:
         name = entry.stem().string();
         fs::path soPath = entry.parent_path() / ("lib" + name + ".so");
 
-        std::string compileCmd =
-            "g++ -shared -fPIC -o \"" + soPath.string() + "\" \"" + entry.string() + "\" -I\"app/headers\"";
+        std::string compileCmd = std::string compileCmd = __PLUGIN_HELPER__::replace_all(__PLUGIN_HELPER__::replace_all(config.cmp_command, "%cppPath%", entry.string()), "%soPath%", dllPath.string());
 
         std::ifstream file(entry.string());
         std::string line;
         if (file.is_open()) {
             std::getline(file, line);
-            if (line.find("//cmp:") == 0)
-                compileCmd.append(" ").append(line.substr(6));
+            if(line.find("//cmp:") == 0) compileCmd.append(" ").append(line.substr(6));
+            if(line.find("// cmp:") == 0) compileCmd.append(" ").append(line.substr(7));
             file.close();
         }
 
